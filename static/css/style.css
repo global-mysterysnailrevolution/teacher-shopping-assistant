@@ -1,0 +1,233 @@
+/* Custom styles for Teacher Shopping Assistant */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.5rem;
+}
+
+.main-content {
+    padding: 2rem 0;
+    min-height: 70vh;
+}
+
+.step-section {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.upload-area {
+    border: 3px dashed #007bff;
+    border-radius: 15px;
+    padding: 3rem 2rem;
+    text-align: center;
+    background-color: #f8f9ff;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.upload-area:hover {
+    border-color: #0056b3;
+    background-color: #e3f2fd;
+    transform: translateY(-2px);
+}
+
+.upload-area.dragover {
+    border-color: #28a745;
+    background-color: #e8f5e8;
+}
+
+.upload-content h4 {
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+.btn-lg {
+    padding: 0.75rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 50px;
+}
+
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background-color: #007bff;
+    color: white;
+    border-radius: 15px 15px 0 0 !important;
+    border: none;
+}
+
+.card-header h5 {
+    margin: 0;
+    font-weight: 600;
+}
+
+#previewImage {
+    max-height: 300px;
+    object-fit: contain;
+}
+
+.identification-item {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.identification-item strong {
+    color: #007bff;
+}
+
+.confidence-high {
+    color: #28a745;
+}
+
+.confidence-medium {
+    color: #ffc107;
+}
+
+.confidence-low {
+    color: #dc3545;
+}
+
+.not-found {
+    background-color: #f8d7da;
+    border-left-color: #dc3545;
+    color: #721c24;
+}
+
+.shop-button {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    border-radius: 50px;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.shop-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    color: white;
+    text-decoration: none;
+}
+
+.spinner-border {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.feature-list {
+    list-style: none;
+    padding: 0;
+}
+
+.feature-list li {
+    padding: 0.25rem 0;
+    color: #6c757d;
+}
+
+.feature-list li:before {
+    content: "• ";
+    color: #007bff;
+    font-weight: bold;
+}
+
+footer {
+    background-color: #343a40;
+    color: white;
+    margin-top: auto;
+}
+
+footer a {
+    color: #6c757d;
+}
+
+footer a:hover {
+    color: #adb5bd;
+}
+
+/* Camera modal styles */
+#cameraVideo {
+    max-width: 100%;
+    max-height: 400px;
+    background-color: #000;
+}
+
+#capturedImage {
+    max-width: 100%;
+    max-height: 400px;
+}
+
+.modal-lg {
+    max-width: 90%;
+}
+
+@media (max-width: 768px) {
+    .modal-lg {
+        max-width: 95%;
+        margin: 0.5rem;
+    }
+    
+    #cameraVideo, #capturedImage {
+        max-height: 300px;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .main-content {
+        padding: 1rem 0;
+    }
+    
+    .step-section {
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .upload-area {
+        padding: 2rem 1rem;
+    }
+    
+    .btn-lg {
+        padding: 0.5rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+/* Loading animation */
+.loading-dots::after {
+    content: '';
+    animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+}
