@@ -23,8 +23,54 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Bio-Link Depot product catalog (we'll scrape this or get it via API)
-BIOLINK_DEPOT_PRODUCTS = [
+def scrape_biolink_products():
+    """
+    Scrape Bio-Link Depot products dynamically
+    """
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        
+        # Scrape the main products page
+        url = "https://www.shopbiolinkdepot.org/"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            products = []
+            # Look for product elements (adjust selectors based on actual site structure)
+            product_elements = soup.find_all(['div', 'article'], class_=['product', 'item'])
+            
+            for element in product_elements:
+                name_elem = element.find(['h1', 'h2', 'h3', 'span'], class_=['name', 'title', 'product-name'])
+                price_elem = element.find(['span', 'div'], class_=['price', 'cost'])
+                
+                if name_elem:
+                    name = name_elem.get_text(strip=True)
+                    price = price_elem.get_text(strip=True) if price_elem else "Price not found"
+                    
+                    # Generate a simple ID from the name
+                    product_id = name.lower().replace(' ', '-').replace(',', '').replace('"', '')
+                    
+                    products.append({
+                        "name": name,
+                        "id": product_id,
+                        "price": price
+                    })
+            
+            logger.info(f"🔍 Scraped {len(products)} products from Bio-Link Depot")
+            return products
+            
+    except Exception as e:
+        logger.error(f"❌ Error scraping products: {e}")
+        return []
+
+# Bio-Link Depot product catalog (fallback static list)
+BIOLINK_DEPOT_PRODUCTS_STATIC = [
     {"name": "175 cm² Flask", "id": "1757018543-63ec5a68", "price": "$150.00"},
     {"name": "5L Erlenmeyer Flask w/ Vent Cap", "id": "1757018891-95c3d175", "price": "$150.00"},
     {"name": "Air Duster Spray", "id": "air-duster-spray", "price": "$16.49"},
@@ -77,6 +123,20 @@ BIOLINK_DEPOT_PRODUCTS = [
     {"name": "Boxes, Insert, 8x8in F14mM VLPK 12", "id": "boxes-insert-8x8in", "price": "$50.50"}
 ]
 
+def get_biolink_products():
+    """
+    Get Bio-Link Depot products (dynamic scraping with fallback)
+    """
+    # Try to scrape fresh products
+    scraped_products = scrape_biolink_products()
+    
+    if scraped_products:
+        return scraped_products
+    else:
+        # Fallback to static list if scraping fails
+        logger.warning("⚠️ Using static product list as fallback")
+        return BIOLINK_DEPOT_PRODUCTS_STATIC
+
 def get_openai_client():
     """Get the OpenAI client instance"""
     api_key = os.getenv('OPENAI_API_KEY')
@@ -101,8 +161,9 @@ def identify_lab_item(image_data):
         # Create the vision message with structured prompt
         logger.info("📤 Sending image to GPT-4o...")
         
-        # Create product list for matching
-        product_names = [product["name"] for product in BIOLINK_DEPOT_PRODUCTS]
+        # Get current product list (dynamic)
+        current_products = get_biolink_products()
+        product_names = [product["name"] for product in current_products]
         product_list_text = "\n".join([f"- {name}" for name in product_names])
         
         response = client.ChatCompletion.create(
@@ -193,8 +254,11 @@ def find_product_url(product_name):
     if product_name == "Not Found":
         return None
     
+    # Get current product list (dynamic)
+    current_products = get_biolink_products()
+    
     # Find matching product
-    for product in BIOLINK_DEPOT_PRODUCTS:
+    for product in current_products:
         if product["name"].lower() == product_name.lower():
             # Construct the product URL
             product_id = product["id"]
