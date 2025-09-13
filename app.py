@@ -30,10 +30,22 @@ def get_zoho_commerce_products():
     try:
         import requests
         
-        # Zoho Commerce API credentials (you'll need to set these)
+        # Zoho Commerce API credentials
         client_id = os.getenv('ZOHO_CLIENT_ID')
         client_secret = os.getenv('ZOHO_CLIENT_SECRET')
         access_token = os.getenv('ZOHO_ACCESS_TOKEN')
+
+        if access_token:
+            access_token = access_token.strip()
+            logger.info(f"🔑 Access token length: {len(access_token)}")
+            logger.info(f"🔑 Access token starts with: {repr(access_token[:10])}")
+        
+        if client_secret:
+            client_secret = client_secret.strip()
+            logger.info(f"🔑 Client secret length: {len(client_secret)}")
+            logger.info(f"🔑 Client secret starts with: {repr(client_secret[:10])}")
+
+        logger.info(f"🔑 Checking Zoho credentials: Client ID={'✅' if client_id else '❌'}, Secret={'✅' if client_secret else '❌'}, Token={'✅' if access_token else '❌'}")
 
         if not all([client_id, client_secret, access_token]):
             logger.warning("⚠️ Zoho Commerce credentials not configured")
@@ -93,114 +105,25 @@ def get_zoho_commerce_products():
         logger.error(f"❌ Error getting Zoho Commerce products: {e}")
         return []
 
-def scrape_biolink_products():
-    """
-    Scrape products from Bio-Link Depot website
-    """
-    try:
-        from bs4 import BeautifulSoup
-        
-        # Scrape the main products page
-        url = "https://www.shopbiolinkdepot.org/"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            products = []
-
-            # Debug: Log the HTML structure to understand the site
-            logger.info("🔍 Analyzing Bio-Link Depot HTML structure...")
-
-            # Try multiple approaches to find products
-            # Look for any elements that might contain product names
-            potential_selectors = [
-                'div.product',
-                'div.item',
-                'article.product',
-                'div[class*="product"]',
-                'div[class*="item"]',
-                'h1', 'h2', 'h3', 'h4',
-                'span[class*="name"]',
-                'span[class*="title"]',
-                'div[class*="name"]',
-                'div[class*="title"]'
-            ]
-
-            for selector in potential_selectors:
-                elements = soup.select(selector)
-                logger.info(f"🔍 Selector '{selector}' found {len(elements)} elements")
-
-                for element in elements:
-                    text = element.get_text(strip=True)
-                    if text and len(text) > 3 and len(text) < 200:  # Reasonable product name length  
-                        # Check if it looks like a product name
-                        if any(keyword in text.lower() for keyword in ['flask', 'bottle', 'tube', 'plate', 'filter', 'red bull', 'redbull']):                                                               
-                            logger.info(f"🎯 Found potential product: {text}")
-
-                            # Try to find price nearby
-                            price = "Price not found"
-                            parent = element.parent
-                            if parent:
-                                price_elem = parent.find(['span', 'div'], string=lambda x: x and '$' in str(x))                                                                                             
-                                if price_elem:
-                                    price = price_elem.get_text(strip=True)
-
-                            # Generate ID
-                            product_id = text.lower().replace(' ', '-').replace(',', '').replace('"', '').replace('²', '2')
-
-                            products.append({
-                                "name": text,
-                                "id": product_id,
-                                "price": price
-                            })
-
-            # Remove duplicates
-            seen = set()
-            unique_products = []
-            for product in products:
-                if product['name'] not in seen:
-                    seen.add(product['name'])
-                    unique_products.append(product)
-
-            logger.info(f"🔍 Scraped {len(unique_products)} unique products from Bio-Link Depot")   
-            for product in unique_products[:5]:  # Log first 5 for debugging
-                logger.info(f"  - {product['name']} ({product['price']})")
-
-            return unique_products
-
-    except Exception as e:
-        logger.error(f"❌ Error scraping Bio-Link Depot: {e}")
-        return []
-
-# No static list - everything is dynamic!
-
 def get_biolink_products():
     """
-    Get Bio-Link Depot products (Zoho Commerce API -> Web scraping)
+    Get Bio-Link Depot products from Zoho Commerce API ONLY
     """
-    # Priority 1: Try Zoho Commerce API
+    # Only use Zoho Commerce API - no web scraping bullshit
     zoho_products = get_zoho_commerce_products()
     if zoho_products:
         logger.info("✅ Using Zoho Commerce API products")
         return zoho_products
 
-    # Priority 2: Try web scraping
-    scraped_products = scrape_biolink_products()
-    if scraped_products:
-        logger.info("✅ Using scraped products")
-        return scraped_products
-
-    # No fallback - return empty list
-    logger.warning("⚠️ No products found from any source")
+    # If API fails, return empty list
+    logger.warning("⚠️ Zoho Commerce API failed - no products available")
     return []
 
 def get_openai_client():
     """Get the OpenAI client instance"""
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
+        logger.error("❌ OPENAI_API_KEY environment variable not set")
         raise ValueError("OPENAI_API_KEY environment variable not set")
 
     # Use the older openai module approach for better compatibility
@@ -254,7 +177,8 @@ def identify_lab_item(image_data):
                 }
             ],
             max_tokens=500,
-            temperature=0.1
+            temperature=0.1,
+            timeout=60  # Add timeout to prevent hanging
         )
 
         logger.info("📥 Received response from GPT-4o")
@@ -300,134 +224,97 @@ def identify_lab_item(image_data):
 
 def find_product_url(product_name):
     """
-    Find the actual product URL in Bio-Link Depot by searching and scraping results
+    Find the actual product URL in Bio-Link Depot using intelligent search
     """
     if product_name == "Not Found":
         return None
     
     try:
-        # Extract key terms from the product name
-        terms = product_name.lower().split()
+        logger.info(f"🔍 Starting intelligent search for: '{product_name}'")
         
-        # Remove common words that might not be in product names
-        stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
-        key_terms = [term for term in terms if term not in stop_words and len(term) > 2]
+        # Step 1: Try Zoho Commerce API first (if credentials are available)
+        zoho_products = get_biolink_products() # Now only calls Zoho API
+        if zoho_products:
+            logger.info("✅ Using Zoho Commerce API for product search")
+            best_match = analyze_products_with_ai(product_name, zoho_products)
+            if best_match:
+                logger.info(f"✅ Found match in Zoho API: {best_match['name']}")
+                return best_match['url']
         
-        # Create multiple search strategies
-        search_strategies = []
-        
-        # Strategy 1: Full product name
-        search_strategies.append(product_name.replace(' ', '+'))
-        
-        # Strategy 2: Key terms only
-        if key_terms:
-            search_strategies.append('+'.join(key_terms))
-        
-        # Strategy 3: Individual key terms (most important first)
-        for term in key_terms[:3]:  # Limit to first 3 terms
-            search_strategies.append(term)
-        
-        # Strategy 4: Brand name + main product (if we can identify them)
-        if len(key_terms) >= 2:
-            # Assume first term is brand, rest is product
-            brand = key_terms[0]
-            product = '+'.join(key_terms[1:])
-            search_strategies.append(f"{brand}+{product}")
-        
-        # Remove duplicates while preserving order
-        unique_strategies = []
-        seen = set()
-        for strategy in search_strategies:
-            if strategy not in seen:
-                unique_strategies.append(strategy)
-                seen.add(strategy)
-        
-        # Try each search strategy until we find a product
-        for search_term in unique_strategies:
-            logger.info(f"🔍 Trying search: '{search_term}'")
-            
-            # Search the store
-            search_url = f"https://www.shopbiolinkdepot.org/search?q={search_term}"
-            
-            try:
-                from bs4 import BeautifulSoup
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-                
-                response = requests.get(search_url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    
-                    # Look for product links in search results - try multiple selectors
-                    product_selectors = [
-                        'a[href*="/product/"]',
-                        'a[href*="/item/"]', 
-                        'a[href*="/products/"]',
-                        'a[href*="/p/"]',
-                        '.product-item a',
-                        '.product-link',
-                        '.item-link',
-                        'a[class*="product"]',
-                        'a[class*="item"]'
-                    ]
-                    
-                    for selector in product_selectors:
-                        product_links = soup.select(selector)
-                        logger.info(f"🔍 Selector '{selector}' found {len(product_links)} links")
-                        
-                        for link in product_links:
-                            href = link.get('href', '')
-                            link_text = link.get_text(strip=True).lower()
-                            
-                            logger.info(f"🔍 Checking link: '{link_text}' -> '{href}'")
-                            
-                            # Check if the link text matches our search terms
-                            if any(term in link_text for term in key_terms):
-                                # Construct full URL
-                                if href.startswith('/'):
-                                    product_url = f"https://www.shopbiolinkdepot.org{href}"
-                                elif href.startswith('http'):
-                                    product_url = href
-                                else:
-                                    product_url = f"https://www.shopbiolinkdepot.org/{href}"
-                                
-                                logger.info(f"✅ Found product: {link_text} -> {product_url}")
-                                return product_url
-                    
-                    # Also try looking for any links that might contain our terms
-                    all_links = soup.find_all('a', href=True)
-                    logger.info(f"🔍 Checking all {len(all_links)} links for matches")
-                    
-                    for link in all_links:
-                        href = link.get('href', '')
-                        link_text = link.get_text(strip=True).lower()
-                        
-                        # Check if the link text matches our search terms
-                        if any(term in link_text for term in key_terms):
-                            # Construct full URL
-                            if href.startswith('/'):
-                                product_url = f"https://www.shopbiolinkdepot.org{href}"
-                            elif href.startswith('http'):
-                                product_url = href
-                            else:
-                                product_url = f"https://www.shopbiolinkdepot.org/{href}"
-                            
-                            logger.info(f"✅ Found product via text match: {link_text} -> {product_url}")
-                            return product_url
-                    
-                    logger.info(f"⚠️ No products found for search: '{search_term}'")
-                    
-            except Exception as e:
-                logger.error(f"❌ Error searching for '{search_term}': {e}")
-                continue
-        
-        # If no product found, return the first search URL as fallback
-        logger.warning(f"⚠️ No direct product found for '{product_name}', returning search URL")
-        return f"https://www.shopbiolinkdepot.org/search?q={unique_strategies[0]}"
+        # Step 2: If no match found in API, return None
+        logger.warning(f"⚠️ No product match found in Zoho Commerce API, returning None")
+        return None
         
     except Exception as e:
-        logger.error(f"❌ Error finding product URL: {e}")
+        logger.error(f"❌ Error in intelligent search: {e}")
+        return None
+
+
+def analyze_products_with_ai(target_product, product_list):
+    """
+    Use AI to analyze product list and find the best match
+    """
+    try:
+        logger.info(f"🤖 AI analyzing {len(product_list)} products for match with '{target_product}'")
+        
+        # Prepare product list for AI
+        products_text = "\n".join([f"{i+1}. {product['name']}" for i, product in enumerate(product_list)])
+        
+        # Get OpenAI client
+        client = get_openai_client()
+        
+        # Create prompt for AI analysis
+        prompt = f"""
+        I'm looking for this product: "{target_product}"
+        
+        Here are the products I found in the store:
+        {products_text}
+        
+        Please analyze these products and tell me which one (if any) matches the product I'm looking for.
+        
+        Return your response in this exact JSON format:
+        {{
+            "match_found": true/false,
+            "best_match_number": 1-{len(product_list)} (the number from the list above),
+            "confidence": "High/Medium/Low",
+            "reasoning": "Why this is or isn't a match"
+        }}
+        
+        Consider:
+        - Brand names (Red Bull, Coca-Cola, etc.)
+        - Product types (Energy Drink, Flask, Beaker, etc.)
+        - Variations (Sugarfree, Sugar-Free, etc.)
+        - Similar products if exact match not found
+        """
+        
+        response = client.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.1
+        )
+        
+        response_content = response.choices[0].message.content
+        logger.info(f"🤖 AI response: {response_content}")
+        
+        # Parse AI response
+        import re
+        json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group())
+            
+            if result.get('match_found') and result.get('best_match_number'):
+                match_index = result['best_match_number'] - 1
+                if 0 <= match_index < len(product_list):
+                    best_product = product_list[match_index]
+                    logger.info(f"✅ AI found match: {best_product['name']} (confidence: {result.get('confidence', 'Unknown')})")
+                    return best_product
+        
+        logger.info("⚠️ AI found no suitable match")
+        return None
+        
+    except Exception as e:
+        logger.error(f"❌ Error in AI analysis: {e}")
         return None
 
 @app.route('/')
@@ -449,6 +336,11 @@ def upload_image():
         # Read and encode the image
         image_data = file.read()
         base64_image = base64.b64encode(image_data).decode('utf-8')
+
+        # Check if OpenAI API key is available
+        if not os.getenv('OPENAI_API_KEY'):
+            logger.error("❌ OPENAI_API_KEY not set, returning error")
+            return jsonify({'error': 'AI service not configured'}), 500
 
         # Identify the lab item
         identification_result = identify_lab_item(base64_image)
