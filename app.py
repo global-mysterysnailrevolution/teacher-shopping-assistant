@@ -255,11 +255,6 @@ def identify_lab_item(image_data):
         # Create the vision message with structured prompt
         logger.info("📤 Sending image to GPT-4o...")
         
-        # Get current product list (dynamic)
-        current_products = get_biolink_products()
-        product_names = [product["name"] for product in current_products]
-        product_list_text = "\n".join([f"- {name}" for name in product_names])
-        
         response = client.ChatCompletion.create(
             model="gpt-4o",
             messages=[
@@ -271,20 +266,16 @@ def identify_lab_item(image_data):
                             "text": f"""
                             Analyze this laboratory equipment image and identify the item. 
                             
-                            Here are the available products from Bio-Link Depot:
-                            {product_list_text}
-                            
                             Return your response in this exact JSON format:
                             {{
-                                "identified_item": "Exact product name from the list above, or 'Not Found' if no match",
+                                "identified_item": "Specific product name (e.g., 'Erlenmeyer Flask 250ml', 'Beaker 500ml', 'Test Tube Rack'), or 'Not Found' if unclear",
                                 "confidence": "High/Medium/Low",
                                 "item_type": "General category (e.g., Flask, Bottle, Filter, etc.)",
                                 "key_features": ["feature1", "feature2", "feature3"],
                                 "notes": "Any additional observations"
                             }}
                             
-                            IMPORTANT: Only return "Not Found" if the item doesn't match any of the products listed above.
-                            Be very specific with product names - match them exactly to the list.
+                            Be specific and descriptive with the product name. Focus on laboratory equipment and supplies.
                             """
                         },
                         {
