@@ -330,9 +330,9 @@ def find_product_url(product_name):
                 logger.info(f"✅ AI found best match: {best_match['name']} -> {best_match['url']}")
                 return best_match['url']
         
-        # Step 5: If no match found, return search URL
-        logger.warning(f"⚠️ No product match found, returning search URL")
-        return f"https://www.shopbiolinkdepot.org/search?q={key_terms[0]}"
+        # Step 5: If no match found, return None (no search URLs!)
+        logger.warning(f"⚠️ No product match found, returning None")
+        return None
         
     except Exception as e:
         logger.error(f"❌ Error in intelligent search: {e}")
@@ -340,7 +340,7 @@ def find_product_url(product_name):
 
 def get_search_results(search_url):
     """
-    Get all product links from a search URL
+    Get ONLY actual product links from a search URL - no navigation links
     """
     try:
         from bs4 import BeautifulSoup
@@ -356,19 +356,21 @@ def get_search_results(search_url):
         soup = BeautifulSoup(response.content, 'html.parser')
         products = []
         
-        # Find all links that could be products
-        all_links = soup.find_all('a', href=True)
+        # ONLY look for links that contain "/products/" in the URL
+        product_links = soup.find_all('a', href=lambda x: x and '/products/' in x)
         
-        for link in all_links:
+        logger.info(f"🔍 Found {len(product_links)} product links with /products/ in URL")
+        
+        for link in product_links:
             href = link.get('href', '')
             text = link.get_text(strip=True)
             
-            # Skip empty or very short text
+            # Skip empty text
             if not text or len(text) < 3:
                 continue
             
-            # Skip navigation links
-            if any(skip in text.lower() for skip in ['home', 'about', 'contact', 'login', 'cart', 'checkout']):
+            # Skip obvious navigation text
+            if any(skip in text.lower() for skip in ['sign in', 'sign up', 'my profile', 'my orders', 'contact us', 'help', 'search', 'home', 'about', 'terms', 'privacy', 'shipping', 'career', 'refund', 'return', 'deliveries', 'information', 'store locations', 'order details']):
                 continue
             
             # Construct full URL
@@ -392,7 +394,10 @@ def get_search_results(search_url):
                 seen.add(product['name'])
                 unique_products.append(product)
         
-        logger.info(f"📦 Extracted {len(unique_products)} unique products")
+        logger.info(f"📦 Extracted {len(unique_products)} actual products")
+        for product in unique_products:
+            logger.info(f"  - {product['name']} -> {product['url']}")
+        
         return unique_products
         
     except Exception as e:
