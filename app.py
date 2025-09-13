@@ -280,7 +280,7 @@ def identify_lab_item(image_data):
 
 def find_product_url(product_name):
     """
-    Find the product URL in Bio-Link Depot using multiple search strategies
+    Find the actual product URL in Bio-Link Depot by searching and scraping results
     """
     if product_name == "Not Found":
         return None
@@ -322,15 +322,54 @@ def find_product_url(product_name):
                 unique_strategies.append(strategy)
                 seen.add(strategy)
         
-        # For now, return the first (most specific) search URL
-        # In the future, we could try multiple searches and return the best match
-        best_search = unique_strategies[0]
-        search_url = f"https://www.shopbiolinkdepot.org/search?q={best_search}"
+        # Try each search strategy until we find a product
+        for search_term in unique_strategies:
+            logger.info(f"🔍 Trying search: '{search_term}'")
+            
+            # Search the store
+            search_url = f"https://www.shopbiolinkdepot.org/search?q={search_term}"
+            
+            try:
+                from bs4 import BeautifulSoup
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+                
+                response = requests.get(search_url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    
+                    # Look for product links in search results
+                    product_links = soup.find_all('a', href=True)
+                    
+                    for link in product_links:
+                        href = link.get('href', '')
+                        link_text = link.get_text(strip=True).lower()
+                        
+                        # Check if this looks like a product link
+                        if '/product/' in href or '/item/' in href:
+                            # Check if the link text matches our search terms
+                            if any(term in link_text for term in key_terms):
+                                # Construct full URL
+                                if href.startswith('/'):
+                                    product_url = f"https://www.shopbiolinkdepot.org{href}"
+                                elif href.startswith('http'):
+                                    product_url = href
+                                else:
+                                    product_url = f"https://www.shopbiolinkdepot.org/{href}"
+                                
+                                logger.info(f"✅ Found product: {link_text} -> {product_url}")
+                                return product_url
+                    
+                    logger.info(f"⚠️ No products found for search: '{search_term}'")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error searching for '{search_term}': {e}")
+                continue
         
-        logger.info(f"🔍 Searching for '{product_name}' using strategy: '{best_search}'")
-        logger.info(f"🔍 Available strategies: {unique_strategies}")
-        
-        return search_url
+        # If no product found, return the first search URL as fallback
+        logger.warning(f"⚠️ No direct product found for '{product_name}', returning search URL")
+        return f"https://www.shopbiolinkdepot.org/search?q={unique_strategies[0]}"
         
     except Exception as e:
         logger.error(f"❌ Error finding product URL: {e}")
