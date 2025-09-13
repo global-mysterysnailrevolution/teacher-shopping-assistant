@@ -181,6 +181,7 @@ def get_openai_client():
     """Get the OpenAI client instance"""
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
+        logger.error("❌ OPENAI_API_KEY environment variable not set")
         raise ValueError("OPENAI_API_KEY environment variable not set")
 
     # Use the older openai module approach for better compatibility
@@ -490,6 +491,11 @@ def upload_image():
         # Read and encode the image
         image_data = file.read()
         base64_image = base64.b64encode(image_data).decode('utf-8')
+
+        # Check if OpenAI API key is available
+        if not os.getenv('OPENAI_API_KEY'):
+            logger.error("❌ OPENAI_API_KEY not set, returning error")
+            return jsonify({'error': 'AI service not configured'}), 500
 
         # Identify the lab item
         identification_result = identify_lab_item(base64_image)
