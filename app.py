@@ -339,15 +339,29 @@ def find_product_url(product_name):
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.content, 'html.parser')
                     
-                    # Look for product links in search results
-                    product_links = soup.find_all('a', href=True)
+                    # Look for product links in search results - try multiple selectors
+                    product_selectors = [
+                        'a[href*="/product/"]',
+                        'a[href*="/item/"]', 
+                        'a[href*="/products/"]',
+                        'a[href*="/p/"]',
+                        '.product-item a',
+                        '.product-link',
+                        '.item-link',
+                        'a[class*="product"]',
+                        'a[class*="item"]'
+                    ]
                     
-                    for link in product_links:
-                        href = link.get('href', '')
-                        link_text = link.get_text(strip=True).lower()
+                    for selector in product_selectors:
+                        product_links = soup.select(selector)
+                        logger.info(f"🔍 Selector '{selector}' found {len(product_links)} links")
                         
-                        # Check if this looks like a product link
-                        if '/product/' in href or '/item/' in href:
+                        for link in product_links:
+                            href = link.get('href', '')
+                            link_text = link.get_text(strip=True).lower()
+                            
+                            logger.info(f"🔍 Checking link: '{link_text}' -> '{href}'")
+                            
                             # Check if the link text matches our search terms
                             if any(term in link_text for term in key_terms):
                                 # Construct full URL
@@ -360,6 +374,27 @@ def find_product_url(product_name):
                                 
                                 logger.info(f"✅ Found product: {link_text} -> {product_url}")
                                 return product_url
+                    
+                    # Also try looking for any links that might contain our terms
+                    all_links = soup.find_all('a', href=True)
+                    logger.info(f"🔍 Checking all {len(all_links)} links for matches")
+                    
+                    for link in all_links:
+                        href = link.get('href', '')
+                        link_text = link.get_text(strip=True).lower()
+                        
+                        # Check if the link text matches our search terms
+                        if any(term in link_text for term in key_terms):
+                            # Construct full URL
+                            if href.startswith('/'):
+                                product_url = f"https://www.shopbiolinkdepot.org{href}"
+                            elif href.startswith('http'):
+                                product_url = href
+                            else:
+                                product_url = f"https://www.shopbiolinkdepot.org/{href}"
+                            
+                            logger.info(f"✅ Found product via text match: {link_text} -> {product_url}")
+                            return product_url
                     
                     logger.info(f"⚠️ No products found for search: '{search_term}'")
                     
