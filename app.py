@@ -42,28 +42,66 @@ def scrape_biolink_products():
             soup = BeautifulSoup(response.content, 'html.parser')
             
             products = []
-            # Look for product elements (adjust selectors based on actual site structure)
-            product_elements = soup.find_all(['div', 'article'], class_=['product', 'item'])
             
-            for element in product_elements:
-                name_elem = element.find(['h1', 'h2', 'h3', 'span'], class_=['name', 'title', 'product-name'])
-                price_elem = element.find(['span', 'div'], class_=['price', 'cost'])
+            # Debug: Log the HTML structure to understand the site
+            logger.info("🔍 Analyzing Bio-Link Depot HTML structure...")
+            
+            # Try multiple approaches to find products
+            # Look for any elements that might contain product names
+            potential_selectors = [
+                'div.product',
+                'div.item', 
+                'article.product',
+                'div[class*="product"]',
+                'div[class*="item"]',
+                'h1', 'h2', 'h3', 'h4',
+                'span[class*="name"]',
+                'span[class*="title"]',
+                'div[class*="name"]',
+                'div[class*="title"]'
+            ]
+            
+            for selector in potential_selectors:
+                elements = soup.select(selector)
+                logger.info(f"🔍 Selector '{selector}' found {len(elements)} elements")
                 
-                if name_elem:
-                    name = name_elem.get_text(strip=True)
-                    price = price_elem.get_text(strip=True) if price_elem else "Price not found"
-                    
-                    # Generate a simple ID from the name
-                    product_id = name.lower().replace(' ', '-').replace(',', '').replace('"', '')
-                    
-                    products.append({
-                        "name": name,
-                        "id": product_id,
-                        "price": price
-                    })
+                for element in elements:
+                    text = element.get_text(strip=True)
+                    if text and len(text) > 3 and len(text) < 200:  # Reasonable product name length
+                        # Check if it looks like a product name
+                        if any(keyword in text.lower() for keyword in ['flask', 'bottle', 'tube', 'plate', 'filter', 'red bull', 'redbull']):
+                            logger.info(f"🎯 Found potential product: {text}")
+                            
+                            # Try to find price nearby
+                            price = "Price not found"
+                            parent = element.parent
+                            if parent:
+                                price_elem = parent.find(['span', 'div'], string=lambda x: x and '$' in str(x))
+                                if price_elem:
+                                    price = price_elem.get_text(strip=True)
+                            
+                            # Generate ID
+                            product_id = text.lower().replace(' ', '-').replace(',', '').replace('"', '').replace('²', '2')
+                            
+                            products.append({
+                                "name": text,
+                                "id": product_id,
+                                "price": price
+                            })
             
-            logger.info(f"🔍 Scraped {len(products)} products from Bio-Link Depot")
-            return products
+            # Remove duplicates
+            seen = set()
+            unique_products = []
+            for product in products:
+                if product['name'] not in seen:
+                    seen.add(product['name'])
+                    unique_products.append(product)
+            
+            logger.info(f"🔍 Scraped {len(unique_products)} unique products from Bio-Link Depot")
+            for product in unique_products[:5]:  # Log first 5 for debugging
+                logger.info(f"  - {product['name']} ({product['price']})")
+            
+            return unique_products
             
     except Exception as e:
         logger.error(f"❌ Error scraping products: {e}")
