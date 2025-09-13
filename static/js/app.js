@@ -269,8 +269,12 @@ async function processImage(imageData) {
             body: formData
         });
         
+        console.log('📡 Upload response status:', uploadResponse.status);
+        
         if (!uploadResponse.ok) {
-            throw new Error(`Server error: ${uploadResponse.status}`);
+            const errorText = await uploadResponse.text();
+            console.error('❌ Server error response:', errorText);
+            throw new Error(`Server error: ${uploadResponse.status} - ${errorText}`);
         }
         
         const result = await uploadResponse.json();
@@ -279,6 +283,7 @@ async function processImage(imageData) {
         if (result.success) {
             displayResults(result);
         } else {
+            console.error('❌ Server returned error:', result.error);
             throw new Error(result.error || 'Unknown error');
         }
         
