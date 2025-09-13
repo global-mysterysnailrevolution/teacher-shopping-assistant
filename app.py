@@ -280,17 +280,56 @@ def identify_lab_item(image_data):
 
 def find_product_url(product_name):
     """
-    Find the product URL in Bio-Link Depot by searching the actual store
+    Find the product URL in Bio-Link Depot using multiple search strategies
     """
     if product_name == "Not Found":
         return None
     
     try:
-        # Search the store directly for the product
-        search_url = f"https://www.shopbiolinkdepot.org/search?q={product_name.replace(' ', '+')}"
+        # Extract key terms from the product name
+        terms = product_name.lower().split()
         
-        # For now, return the search URL - this will let users find the product
-        logger.info(f"🔍 Searching for '{product_name}' in store")
+        # Remove common words that might not be in product names
+        stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
+        key_terms = [term for term in terms if term not in stop_words and len(term) > 2]
+        
+        # Create multiple search strategies
+        search_strategies = []
+        
+        # Strategy 1: Full product name
+        search_strategies.append(product_name.replace(' ', '+'))
+        
+        # Strategy 2: Key terms only
+        if key_terms:
+            search_strategies.append('+'.join(key_terms))
+        
+        # Strategy 3: Individual key terms (most important first)
+        for term in key_terms[:3]:  # Limit to first 3 terms
+            search_strategies.append(term)
+        
+        # Strategy 4: Brand name + main product (if we can identify them)
+        if len(key_terms) >= 2:
+            # Assume first term is brand, rest is product
+            brand = key_terms[0]
+            product = '+'.join(key_terms[1:])
+            search_strategies.append(f"{brand}+{product}")
+        
+        # Remove duplicates while preserving order
+        unique_strategies = []
+        seen = set()
+        for strategy in search_strategies:
+            if strategy not in seen:
+                unique_strategies.append(strategy)
+                seen.add(strategy)
+        
+        # For now, return the first (most specific) search URL
+        # In the future, we could try multiple searches and return the best match
+        best_search = unique_strategies[0]
+        search_url = f"https://www.shopbiolinkdepot.org/search?q={best_search}"
+        
+        logger.info(f"🔍 Searching for '{product_name}' using strategy: '{best_search}'")
+        logger.info(f"🔍 Available strategies: {unique_strategies}")
+        
         return search_url
         
     except Exception as e:
