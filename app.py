@@ -59,7 +59,7 @@ def get_zoho_commerce_products():
             logger.info(f"🌐 Trying Zoho API endpoint: {api_url}")
             
             try:
-                response = requests.get(api_url, headers=headers, timeout=10)
+                response = requests.get(api_url, headers=headers, timeout=30)
                 logger.info(f"📡 Response status: {response.status_code}")
                 
                 if response.status_code == 200:
@@ -168,7 +168,8 @@ def identify_lab_item(image_data):
                 }
             ],
             max_tokens=500,
-            temperature=0.1
+            temperature=0.1,
+            timeout=60  # Add timeout to prevent hanging
         )
 
         logger.info("📥 Received response from GPT-4o")
