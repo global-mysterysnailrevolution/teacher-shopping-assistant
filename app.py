@@ -35,11 +35,16 @@ def get_zoho_commerce_products():
         client_secret = os.getenv('ZOHO_CLIENT_SECRET')
         access_token = os.getenv('ZOHO_ACCESS_TOKEN')
         
-        # Clean up the access token (remove newlines, extra spaces, etc.)
+        # Clean up the credentials (remove newlines, extra spaces, etc.)
         if access_token:
             access_token = access_token.strip()
             logger.info(f"🔑 Access token length: {len(access_token)}")
             logger.info(f"🔑 Access token starts with: {repr(access_token[:10])}")
+        
+        if client_secret:
+            client_secret = client_secret.strip()
+            logger.info(f"🔑 Client secret length: {len(client_secret)}")
+            logger.info(f"🔑 Client secret starts with: {repr(client_secret[:10])}")
 
         logger.info(f"🔑 Checking Zoho credentials: Client ID={'✅' if client_id else '❌'}, Secret={'✅' if client_secret else '❌'}, Token={'✅' if access_token else '❌'}")
 
