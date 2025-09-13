@@ -9,7 +9,7 @@ import requests
 import json
 import re
 from flask import Flask, render_template, request, jsonify, redirect, url_for
-from openai import OpenAI
+# OpenAI will be imported dynamically in get_openai_client()
 from dotenv import load_dotenv
 import logging
 
