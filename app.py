@@ -395,3 +395,28 @@ def upload_image():
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+                l o g g e r . e r r o r ( f " E r r o r   p r o c e s s i n g   i m a g e :   { s t r ( e ) } " ) 
+                 r e t u r n   j s o n i f y ( { " e r r o r " :   " F a i l e d   t o   p r o c e s s   i m a g e " } ) ,   5 0 0 
+ 
+ d e f   f i n d _ p r o d u c t _ u r l ( p r o d u c t _ n a m e ) : 
+         " " " 
+         F i n d   t h e   p r o d u c t   U R L   i n   B i o - L i n k   D e p o t 
+         " " " 
+         i f   p r o d u c t _ n a m e   = =   " N o t   F o u n d " : 
+                 r e t u r n   N o n e 
+         
+         #   G e t   c u r r e n t   p r o d u c t s 
+         p r o d u c t s   =   g e t _ b i o l i n k _ p r o d u c t s ( ) 
+         
+         #   S e a r c h   f o r   m a t c h i n g   p r o d u c t 
+         f o r   p r o d u c t   i n   p r o d u c t s : 
+                 i f   p r o d u c t _ n a m e . l o w e r ( )   i n   p r o d u c t [ " n a m e " ] . l o w e r ( ) : 
+                         #   C o n s t r u c t   t h e   p r o d u c t   U R L 
+                         p r o d u c t _ i d   =   p r o d u c t [ " i d " ] 
+                         r e t u r n   f " h t t p s : / / w w w . s h o p b i o l i n k d e p o t . o r g / p r o d u c t / { p r o d u c t _ i d } " 
+         
+         r e t u r n   N o n e 
+ 
+ i f   _ _ n a m e _ _   = =   " _ _ m a i n _ _ " : 
+         a p p . r u n ( d e b u g = T r u e )  
+ 
