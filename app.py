@@ -51,11 +51,11 @@ def get_zoho_commerce_products():
             logger.warning("⚠️ Zoho Commerce credentials not configured")
             return []
 
-        # Zoho Commerce API endpoint - try different formats
+        # Zoho Commerce API endpoint - correct storefront API
         api_urls = [
-            "https://commerce.zoho.com/api/v1/products",
-            "https://commerce.zoho.com/api/v1/store/products",
-            "https://www.zoho.com/commerce/api/v1/products"
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=all",
+            "https://commerce.zoho.com/storefront/api/v1/products",
+            "https://commerce.zoho.com/api/v1/products"
         ]
 
         headers = {
