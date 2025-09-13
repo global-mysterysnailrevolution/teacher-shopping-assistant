@@ -23,6 +23,56 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+def get_zoho_commerce_products():
+    """
+    Get products from Zoho Commerce API
+    """
+    try:
+        import requests
+        
+        # Zoho Commerce API credentials (you'll need to set these)
+        client_id = os.getenv('ZOHO_CLIENT_ID')
+        client_secret = os.getenv('ZOHO_CLIENT_SECRET')
+        access_token = os.getenv('ZOHO_ACCESS_TOKEN')
+        
+        if not all([client_id, client_secret, access_token]):
+            logger.warning("⚠️ Zoho Commerce credentials not configured")
+            return []
+        
+        # Zoho Commerce API endpoint
+        api_url = "https://commerce.zoho.com/api/v1/products"
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            products = []
+            
+            for product in data.get('products', []):
+                products.append({
+                    "name": product.get('name', ''),
+                    "id": product.get('id', ''),
+                    "price": f"${product.get('price', 0)}",
+                    "description": product.get('description', ''),
+                    "status": product.get('status', '')
+                })
+            
+            logger.info(f"🔍 Retrieved {len(products)} products from Zoho Commerce")
+            return products
+            
+        else:
+            logger.error(f"❌ Zoho Commerce API error: {response.status_code} - {response.text}")
+            return []
+            
+    except Exception as e:
+        logger.error(f"❌ Error getting Zoho Commerce products: {e}")
+        return []
+
 def scrape_biolink_products():
     """
     Scrape Bio-Link Depot products dynamically
@@ -163,17 +213,23 @@ BIOLINK_DEPOT_PRODUCTS_STATIC = [
 
 def get_biolink_products():
     """
-    Get Bio-Link Depot products (dynamic scraping with fallback)
+    Get Bio-Link Depot products (Zoho Commerce API -> Web scraping -> Static fallback)
     """
-    # Try to scrape fresh products
-    scraped_products = scrape_biolink_products()
+    # Priority 1: Try Zoho Commerce API
+    zoho_products = get_zoho_commerce_products()
+    if zoho_products:
+        logger.info("✅ Using Zoho Commerce API products")
+        return zoho_products
     
+    # Priority 2: Try web scraping
+    scraped_products = scrape_biolink_products()
     if scraped_products:
+        logger.info("✅ Using scraped products")
         return scraped_products
-    else:
-        # Fallback to static list if scraping fails
-        logger.warning("⚠️ Using static product list as fallback")
-        return BIOLINK_DEPOT_PRODUCTS_STATIC
+    
+    # Priority 3: Fallback to static list
+    logger.warning("⚠️ Using static product list as fallback")
+    return BIOLINK_DEPOT_PRODUCTS_STATIC
 
 def get_openai_client():
     """Get the OpenAI client instance"""
