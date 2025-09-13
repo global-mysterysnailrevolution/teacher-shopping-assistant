@@ -30,44 +30,67 @@ def get_zoho_commerce_products():
     try:
         import requests
         
-        # Zoho Commerce API credentials (you'll need to set these)
+        # Zoho Commerce API credentials
         client_id = os.getenv('ZOHO_CLIENT_ID')
         client_secret = os.getenv('ZOHO_CLIENT_SECRET')
         access_token = os.getenv('ZOHO_ACCESS_TOKEN')
+
+        logger.info(f"🔑 Checking Zoho credentials: Client ID={'✅' if client_id else '❌'}, Secret={'✅' if client_secret else '❌'}, Token={'✅' if access_token else '❌'}")
 
         if not all([client_id, client_secret, access_token]):
             logger.warning("⚠️ Zoho Commerce credentials not configured")
             return []
 
-        # Zoho Commerce API endpoint
-        api_url = "https://commerce.zoho.com/api/v1/products"
+        # Try different Zoho Commerce API endpoints
+        api_endpoints = [
+            "https://commerce.zoho.com/api/v1/products",
+            "https://commerce.zoho.com/api/v1/store/products", 
+            f"https://commerce.zoho.com/api/v1/store/{client_id}/products"
+        ]
 
         headers = {
             'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-ZOHO-CLIENT-ID': client_id,
+            'X-ZOHO-CLIENT-SECRET': client_secret
         }
         
-        response = requests.get(api_url, headers=headers, timeout=10)
+        for api_url in api_endpoints:
+            logger.info(f"🌐 Trying Zoho API endpoint: {api_url}")
+            
+            try:
+                response = requests.get(api_url, headers=headers, timeout=10)
+                logger.info(f"📡 Response status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"📦 Raw API response: {str(data)[:500]}...")
+                    
+                    products = []
+                    product_list = data.get('products', data.get('data', []))
+                    
+                    for product in product_list:
+                        products.append({
+                            "name": product.get('name', ''),
+                            "id": product.get('id', ''),
+                            "price": f"${product.get('price', 0)}",
+                            "description": product.get('description', ''),
+                            "status": product.get('status', ''),
+                            "url": product.get('url', f"https://www.shopbiolinkdepot.org/products/{product.get('id', '')}")
+                        })
 
-        if response.status_code == 200:
-            data = response.json()
-            products = []
+                    logger.info(f"✅ Retrieved {len(products)} products from Zoho Commerce")
+                    return products
+                    
+                else:
+                    logger.error(f"❌ Zoho Commerce API error: {response.status_code} - {response.text}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error with endpoint {api_url}: {e}")
+                continue
 
-            for product in data.get('products', []):
-                products.append({
-                    "name": product.get('name', ''),
-                    "id": product.get('id', ''),
-                    "price": f"${product.get('price', 0)}",
-                    "description": product.get('description', ''),
-                    "status": product.get('status', '')
-                })
-
-            logger.info(f"🔍 Retrieved {len(products)} products from Zoho Commerce")
-            return products
-
-        else:
-            logger.error(f"❌ Zoho Commerce API error: {response.status_code} - {response.text}")
-            return []
+        logger.error("❌ All Zoho Commerce API endpoints failed")
+        return []
 
     except Exception as e:
         logger.error(f"❌ Error getting Zoho Commerce products: {e}")
@@ -289,28 +312,34 @@ def find_product_url(product_name):
     try:
         logger.info(f"🔍 Starting intelligent search for: '{product_name}'")
         
-        # Step 1: Break down the product name into search terms
+        # Step 1: Try Zoho Commerce API first (if credentials are available)
+        zoho_products = get_zoho_commerce_products()
+        if zoho_products:
+            logger.info("✅ Using Zoho Commerce API for product search")
+            best_match = analyze_products_with_ai(product_name, zoho_products)
+            if best_match:
+                logger.info(f"✅ Found match in Zoho API: {best_match['name']}")
+                return best_match['url']
+        
+        
+        # Step 3: Try web scraping search (may not work due to JavaScript)
         terms = product_name.lower().split()
         stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
         key_terms = [term for term in terms if term not in stop_words and len(term) > 2]
         
         logger.info(f"🔍 Key terms: {key_terms}")
         
-        # Step 2: Try searches with different term combinations
+        # Try searches with different term combinations
         search_terms = []
-        
-        # Add individual terms (most important first)
         for term in key_terms[:3]:  # Try first 3 terms
             search_terms.append(term)
         
-        # Add combinations
         if len(key_terms) >= 2:
-            search_terms.append(f"{key_terms[0]}+{key_terms[1]}")  # First two terms
+            search_terms.append(f"{key_terms[0]}+{key_terms[1]}")
         
-        # Add full name
         search_terms.append(product_name.replace(' ', '+'))
         
-        # Step 3: For each search term, get all product links and let AI decide
+        # For each search term, get all product links and let AI decide
         for search_term in search_terms:
             logger.info(f"🔍 Searching with term: '{search_term}'")
             
@@ -324,20 +353,21 @@ def find_product_url(product_name):
             
             logger.info(f"📦 Found {len(product_links)} products for '{search_term}'")
             
-            # Step 4: Let AI analyze the results and find the best match
+            # Let AI analyze the results and find the best match
             best_match = analyze_products_with_ai(product_name, product_links)
             
             if best_match:
                 logger.info(f"✅ AI found best match: {best_match['name']} -> {best_match['url']}")
                 return best_match['url']
         
-        # Step 5: If no match found, return None (no search URLs!)
+        # Step 4: If no match found, return None (no search URLs!)
         logger.warning(f"⚠️ No product match found, returning None")
         return None
         
     except Exception as e:
         logger.error(f"❌ Error in intelligent search: {e}")
         return None
+
 
 def get_search_results(search_url):
     """
