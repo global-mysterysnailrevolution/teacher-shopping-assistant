@@ -96,108 +96,18 @@ def get_zoho_commerce_products():
         logger.error(f"❌ Error getting Zoho Commerce products: {e}")
         return []
 
-def scrape_biolink_products():
-    """
-    Scrape products from Bio-Link Depot website
-    """
-    try:
-        from bs4 import BeautifulSoup
-        
-        # Scrape the main products page
-        url = "https://www.shopbiolinkdepot.org/"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            products = []
-
-            # Debug: Log the HTML structure to understand the site
-            logger.info("🔍 Analyzing Bio-Link Depot HTML structure...")
-
-            # Try multiple approaches to find products
-            # Look for any elements that might contain product names
-            potential_selectors = [
-                'div.product',
-                'div.item',
-                'article.product',
-                'div[class*="product"]',
-                'div[class*="item"]',
-                'h1', 'h2', 'h3', 'h4',
-                'span[class*="name"]',
-                'span[class*="title"]',
-                'div[class*="name"]',
-                'div[class*="title"]'
-            ]
-
-            for selector in potential_selectors:
-                elements = soup.select(selector)
-                logger.info(f"🔍 Selector '{selector}' found {len(elements)} elements")
-
-                for element in elements:
-                    text = element.get_text(strip=True)
-                    if text and len(text) > 3 and len(text) < 200:  # Reasonable product name length  
-                        # Check if it looks like a product name
-                        if any(keyword in text.lower() for keyword in ['flask', 'bottle', 'tube', 'plate', 'filter', 'red bull', 'redbull']):                                                               
-                            logger.info(f"🎯 Found potential product: {text}")
-
-                            # Try to find price nearby
-                            price = "Price not found"
-                            parent = element.parent
-                            if parent:
-                                price_elem = parent.find(['span', 'div'], string=lambda x: x and '$' in str(x))                                                                                             
-                                if price_elem:
-                                    price = price_elem.get_text(strip=True)
-
-                            # Generate ID
-                            product_id = text.lower().replace(' ', '-').replace(',', '').replace('"', '').replace('²', '2')
-
-                            products.append({
-                                "name": text,
-                                "id": product_id,
-                                "price": price
-                            })
-
-            # Remove duplicates
-            seen = set()
-            unique_products = []
-            for product in products:
-                if product['name'] not in seen:
-                    seen.add(product['name'])
-                    unique_products.append(product)
-
-            logger.info(f"🔍 Scraped {len(unique_products)} unique products from Bio-Link Depot")   
-            for product in unique_products[:5]:  # Log first 5 for debugging
-                logger.info(f"  - {product['name']} ({product['price']})")
-
-            return unique_products
-
-    except Exception as e:
-        logger.error(f"❌ Error scraping Bio-Link Depot: {e}")
-        return []
-
-# No static list - everything is dynamic!
-
 def get_biolink_products():
     """
-    Get Bio-Link Depot products (Zoho Commerce API -> Web scraping)
+    Get Bio-Link Depot products from Zoho Commerce API ONLY
     """
-    # Priority 1: Try Zoho Commerce API
+    # Only use Zoho Commerce API - no web scraping bullshit
     zoho_products = get_zoho_commerce_products()
     if zoho_products:
         logger.info("✅ Using Zoho Commerce API products")
         return zoho_products
 
-    # Priority 2: Try web scraping
-    scraped_products = scrape_biolink_products()
-    if scraped_products:
-        logger.info("✅ Using scraped products")
-        return scraped_products
-
-    # No fallback - return empty list
-    logger.warning("⚠️ No products found from any source")
+    # If API fails, return empty list
+    logger.warning("⚠️ Zoho Commerce API failed - no products available")
     return []
 
 def get_openai_client():
@@ -322,46 +232,8 @@ def find_product_url(product_name):
                 return best_match['url']
         
         
-        # Step 3: Try web scraping search (may not work due to JavaScript)
-        terms = product_name.lower().split()
-        stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
-        key_terms = [term for term in terms if term not in stop_words and len(term) > 2]
-        
-        logger.info(f"🔍 Key terms: {key_terms}")
-        
-        # Try searches with different term combinations
-        search_terms = []
-        for term in key_terms[:3]:  # Try first 3 terms
-            search_terms.append(term)
-        
-        if len(key_terms) >= 2:
-            search_terms.append(f"{key_terms[0]}+{key_terms[1]}")
-        
-        search_terms.append(product_name.replace(' ', '+'))
-        
-        # For each search term, get all product links and let AI decide
-        for search_term in search_terms:
-            logger.info(f"🔍 Searching with term: '{search_term}'")
-            
-            # Get search results
-            search_url = f"https://www.shopbiolinkdepot.org/search?q={search_term}"
-            product_links = get_search_results(search_url)
-            
-            if not product_links:
-                logger.info(f"⚠️ No results for '{search_term}'")
-                continue
-            
-            logger.info(f"📦 Found {len(product_links)} products for '{search_term}'")
-            
-            # Let AI analyze the results and find the best match
-            best_match = analyze_products_with_ai(product_name, product_links)
-            
-            if best_match:
-                logger.info(f"✅ AI found best match: {best_match['name']} -> {best_match['url']}")
-                return best_match['url']
-        
-        # Step 4: If no match found, return None (no search URLs!)
-        logger.warning(f"⚠️ No product match found, returning None")
+        # Step 2: If no match found in API, return None
+        logger.warning(f"⚠️ No product match found in Zoho Commerce API, returning None")
         return None
         
     except Exception as e:
@@ -369,71 +241,6 @@ def find_product_url(product_name):
         return None
 
 
-def get_search_results(search_url):
-    """
-    Get ONLY actual product links from a search URL - no navigation links
-    """
-    try:
-        from bs4 import BeautifulSoup
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(search_url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            logger.error(f"❌ Search failed: {response.status_code}")
-            return []
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        products = []
-        
-        # ONLY look for links that contain "/products/" in the URL
-        product_links = soup.find_all('a', href=lambda x: x and '/products/' in x)
-        
-        logger.info(f"🔍 Found {len(product_links)} product links with /products/ in URL")
-        
-        for link in product_links:
-            href = link.get('href', '')
-            text = link.get_text(strip=True)
-            
-            # Skip empty text
-            if not text or len(text) < 3:
-                continue
-            
-            # Skip obvious navigation text
-            if any(skip in text.lower() for skip in ['sign in', 'sign up', 'my profile', 'my orders', 'contact us', 'help', 'search', 'home', 'about', 'terms', 'privacy', 'shipping', 'career', 'refund', 'return', 'deliveries', 'information', 'store locations', 'order details']):
-                continue
-            
-            # Construct full URL
-            if href.startswith('/'):
-                full_url = f"https://www.shopbiolinkdepot.org{href}"
-            elif href.startswith('http'):
-                full_url = href
-            else:
-                full_url = f"https://www.shopbiolinkdepot.org/{href}"
-            
-            products.append({
-                'name': text,
-                'url': full_url
-            })
-        
-        # Remove duplicates
-        seen = set()
-        unique_products = []
-        for product in products:
-            if product['name'] not in seen:
-                seen.add(product['name'])
-                unique_products.append(product)
-        
-        logger.info(f"📦 Extracted {len(unique_products)} actual products")
-        for product in unique_products:
-            logger.info(f"  - {product['name']} -> {product['url']}")
-        
-        return unique_products
-        
-    except Exception as e:
-        logger.error(f"❌ Error getting search results: {e}")
-        return []
 
 def analyze_products_with_ai(target_product, product_list):
     """
