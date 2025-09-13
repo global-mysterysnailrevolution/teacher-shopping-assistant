@@ -155,23 +155,11 @@ def scrape_biolink_products():
         logger.error(f"❌ Error scraping Bio-Link Depot: {e}")
         return []
 
-# Static fallback product list
-BIOLINK_DEPOT_PRODUCTS_STATIC = [
-    {"name": "Red Bull Energy Drink", "id": "red-bull-energy-drink", "price": "$2.99"},
-    {"name": "Erlenmeyer Flask 250ml", "id": "erlenmeyer-flask-250ml", "price": "$15.99"},
-    {"name": "Beaker 500ml", "id": "beaker-500ml", "price": "$12.99"},
-    {"name": "Test Tube Rack", "id": "test-tube-rack", "price": "$8.99"},
-    {"name": "Pipette 10ml", "id": "pipette-10ml", "price": "$5.99"},
-    {"name": "Microscope Slides", "id": "microscope-slides", "price": "$3.99"},
-    {"name": "Petri Dishes", "id": "petri-dishes", "price": "$7.99"},
-    {"name": "Graduated Cylinder 100ml", "id": "graduated-cylinder-100ml", "price": "$18.99"},
-    {"name": "Bunsen Burner", "id": "bunsen-burner", "price": "$45.99"},
-    {"name": "Safety Goggles", "id": "safety-goggles", "price": "$9.99"}
-]
+# No static list - everything is dynamic!
 
 def get_biolink_products():
     """
-    Get Bio-Link Depot products (Zoho Commerce API -> Web scraping -> Static fallback)
+    Get Bio-Link Depot products (Zoho Commerce API -> Web scraping)
     """
     # Priority 1: Try Zoho Commerce API
     zoho_products = get_zoho_commerce_products()
@@ -185,9 +173,9 @@ def get_biolink_products():
         logger.info("✅ Using scraped products")
         return scraped_products
 
-    # Priority 3: Fallback to static list
-    logger.warning("⚠️ Using static product list as fallback")
-    return BIOLINK_DEPOT_PRODUCTS_STATIC
+    # No fallback - return empty list
+    logger.warning("⚠️ No products found from any source")
+    return []
 
 def get_openai_client():
     """Get the OpenAI client instance"""
@@ -222,18 +210,18 @@ def identify_lab_item(image_data):
                         {
                             "type": "text",
                             "text": f"""
-                            Analyze this laboratory equipment image and identify the item.
+                            Analyze this image and identify the item.
 
                             Return your response in this exact JSON format:
                             {{
-                                "identified_item": "Specific product name (e.g., 'Erlenmeyer Flask 250ml', 'Beaker 500ml', 'Test Tube Rack'), or 'Not Found' if unclear",
+                                "identified_item": "Specific product name (e.g., 'Red Bull Energy Drink', 'Erlenmeyer Flask 250ml', 'Beaker 500ml'), or 'Not Found' if unclear",
                                 "confidence": "High/Medium/Low",
-                                "item_type": "General category (e.g., Flask, Bottle, Filter, etc.)",
+                                "item_type": "General category (e.g., Beverage, Flask, Bottle, Filter, etc.)",
                                 "key_features": ["feature1", "feature2", "feature3"],
                                 "notes": "Any additional observations"
                             }}
 
-                            Be specific and descriptive with the product name. Focus on laboratory equipment and supplies.
+                            Be specific and descriptive with the product name. Identify ANY item that could be sold in a store.
                             """
                         },
                         {
@@ -292,22 +280,22 @@ def identify_lab_item(image_data):
 
 def find_product_url(product_name):
     """
-    Find the product URL in Bio-Link Depot
+    Find the product URL in Bio-Link Depot by searching the actual store
     """
     if product_name == "Not Found":
         return None
     
-    # Get current products
-    products = get_biolink_products()
-    
-    # Search for matching product
-    for product in products:
-        if product_name.lower() in product["name"].lower():
-            # Construct the product URL
-            product_id = product["id"]
-            return f"https://www.shopbiolinkdepot.org/product/{product_id}"
-    
-    return None
+    try:
+        # Search the store directly for the product
+        search_url = f"https://www.shopbiolinkdepot.org/search?q={product_name.replace(' ', '+')}"
+        
+        # For now, return the search URL - this will let users find the product
+        logger.info(f"🔍 Searching for '{product_name}' in store")
+        return search_url
+        
+    except Exception as e:
+        logger.error(f"❌ Error finding product URL: {e}")
+        return None
 
 @app.route('/')
 def index():
