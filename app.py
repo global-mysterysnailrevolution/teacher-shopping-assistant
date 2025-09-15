@@ -35,9 +35,13 @@ def get_zoho_commerce_products():
         
         logger.info(f"🌐 Using Zoho Commerce Storefront API for domain: {store_domain}")
 
-        # Storefront API endpoints
+        # Storefront API endpoints - try different ways to get ALL products
         api_urls = [
             "https://commerce.zoho.com/storefront/api/v1/products",
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=red",
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=bull", 
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=energy",
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=drink",
             "https://commerce.zoho.com/storefront/api/v1/search-products?q=all"
         ]
 
