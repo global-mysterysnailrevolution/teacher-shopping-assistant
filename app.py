@@ -86,6 +86,10 @@ def get_zoho_commerce_products():
                             product_id = product.get('product_id', product.get('id', ''))
                             product_url = f"https://www.shopbiolinkdepot.org/products/{product_id}"
                         
+                        # Fix relative URLs - make them absolute
+                        if product_url.startswith('/'):
+                            product_url = f"https://www.shopbiolinkdepot.org{product_url}"
+                        
                         logger.info(f"📦 Product: {product.get('name', '')} -> URL: {product_url}")
                         
                         products.append({
