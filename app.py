@@ -42,6 +42,10 @@ def get_zoho_commerce_products():
             "https://commerce.zoho.com/storefront/api/v1/search-products?q=bull", 
             "https://commerce.zoho.com/storefront/api/v1/search-products?q=energy",
             "https://commerce.zoho.com/storefront/api/v1/search-products?q=drink",
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=beckman",
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=coulter",
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=sample",
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=cup",
             "https://commerce.zoho.com/storefront/api/v1/search-products?q=all"
         ]
 
