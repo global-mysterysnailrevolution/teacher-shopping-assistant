@@ -25,47 +25,30 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 def get_zoho_commerce_products():
     """
-    Get products from Zoho Commerce API
+    Get products from Zoho Commerce Storefront API (UNAUTHENTICATED)
     """
     try:
         import requests
         
-        # Zoho Commerce API credentials
-        client_id = os.getenv('ZOHO_CLIENT_ID')
-        client_secret = os.getenv('ZOHO_CLIENT_SECRET')
-        access_token = os.getenv('ZOHO_ACCESS_TOKEN')
-
-        if access_token:
-            access_token = access_token.strip()
-            logger.info(f"🔑 Access token length: {len(access_token)}")
-            logger.info(f"🔑 Access token starts with: {repr(access_token[:10])}")
+        # Storefront API is UNAUTHENTICATED - only needs domain-name header
+        store_domain = "www.shopbiolinkdepot.org"  # Your store's domain
         
-        if client_secret:
-            client_secret = client_secret.strip()
-            logger.info(f"🔑 Client secret length: {len(client_secret)}")
-            logger.info(f"🔑 Client secret starts with: {repr(client_secret[:10])}")
+        logger.info(f"🌐 Using Zoho Commerce Storefront API for domain: {store_domain}")
 
-        logger.info(f"🔑 Checking Zoho credentials: Client ID={'✅' if client_id else '❌'}, Secret={'✅' if client_secret else '❌'}, Token={'✅' if access_token else '❌'}")
-
-        if not all([client_id, client_secret, access_token]):
-            logger.warning("⚠️ Zoho Commerce credentials not configured")
-            return []
-
-        # Zoho Commerce API endpoint - correct storefront API
+        # Storefront API endpoints
         api_urls = [
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=all",
             "https://commerce.zoho.com/storefront/api/v1/products",
-            "https://commerce.zoho.com/api/v1/products"
+            "https://commerce.zoho.com/storefront/api/v1/search-products?q=all"
         ]
 
         headers = {
-            'Authorization': 'Bearer ' + access_token,
+            'domain-name': store_domain,
             'Content-Type': 'application/json'
         }
         
         # Try each API endpoint
         for api_url in api_urls:
-            logger.info(f"🌐 Trying Zoho API: {api_url}")
+            logger.info(f"🌐 Trying Storefront API: {api_url}")
             try:
                 response = requests.get(api_url, headers=headers, timeout=30)
 
@@ -81,24 +64,24 @@ def get_zoho_commerce_products():
                     for product in product_list:
                         products.append({
                             "name": product.get('name', ''),
-                            "id": product.get('id', ''),
-                            "price": f"${product.get('price', 0)}",
-                            "description": product.get('description', ''),
-                            "status": product.get('status', ''),
-                            "url": product.get('url', f"https://www.shopbiolinkdepot.org/products/{product.get('id', '')}")
+                            "id": product.get('product_id', product.get('id', '')),
+                            "price": f"${product.get('selling_price', product.get('price', 0))}",
+                            "description": product.get('description', product.get('short_description', '')),
+                            "status": "active",
+                            "url": product.get('url', product.get('handle', f"https://www.shopbiolinkdepot.org/products/{product.get('product_id', '')}"))
                         })
 
-                    logger.info(f"✅ Retrieved {len(products)} products from Zoho Commerce")
+                    logger.info(f"✅ Retrieved {len(products)} products from Zoho Commerce Storefront")
                     return products
                     
                 else:
-                    logger.error(f"❌ Zoho Commerce API error: {response.status_code} - {response.text}")
+                    logger.error(f"❌ Storefront API error: {response.status_code} - {response.text}")
                     
             except Exception as e:
                 logger.error(f"❌ Error with {api_url}: {e}")
                 continue
         
-        logger.error("❌ All Zoho Commerce API endpoints failed")
+        logger.error("❌ All Storefront API endpoints failed")
         return []
 
     except Exception as e:
