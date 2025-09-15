@@ -76,13 +76,25 @@ def get_zoho_commerce_products():
                         product_list = data['payload']['products']
                     
                     for product in product_list:
+                        # Get the correct product URL
+                        product_url = product.get('url', '')
+                        if not product_url:
+                            # Try different URL fields
+                            product_url = product.get('handle', '')
+                        if not product_url:
+                            # Construct URL from product ID
+                            product_id = product.get('product_id', product.get('id', ''))
+                            product_url = f"https://www.shopbiolinkdepot.org/products/{product_id}"
+                        
+                        logger.info(f"📦 Product: {product.get('name', '')} -> URL: {product_url}")
+                        
                         products.append({
                             "name": product.get('name', ''),
                             "id": product.get('product_id', product.get('id', '')),
                             "price": f"${product.get('selling_price', product.get('price', 0))}",
                             "description": product.get('description', product.get('short_description', '')),
                             "status": "active",
-                            "url": product.get('url', product.get('handle', f"https://www.shopbiolinkdepot.org/products/{product.get('product_id', '')}"))
+                            "url": product_url
                         })
 
                     logger.info(f"✅ Retrieved {len(products)} products from Zoho Commerce Storefront")

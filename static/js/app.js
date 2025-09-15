@@ -331,11 +331,28 @@ function displayResults(result) {
             </div>
         `;
         
-        // Show shop button if product URL is available
+        // Show shop button and URL if product URL is available
         const shopButton = document.getElementById('shopButton');
         if (result.product_url) {
             shopButton.style.display = 'inline-block';
             shopButton.onclick = () => goToShop(result.product_url);
+            
+            // Add the product URL as a hyperlink above the button
+            html += `
+                <div class="mt-3 text-center">
+                    <h5 class="text-success mb-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Product Found!
+                    </h5>
+                    <p class="mb-3">
+                        <strong>Direct Link:</strong> 
+                        <a href="${result.product_url}" target="_blank" class="text-primary text-decoration-none">
+                            ${result.product_url}
+                            <i class="fas fa-external-link-alt ms-1"></i>
+                        </a>
+                    </p>
+                </div>
+            `;
         } else {
             shopButton.style.display = 'none';
         }
