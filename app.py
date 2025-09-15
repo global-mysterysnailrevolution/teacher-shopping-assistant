@@ -56,10 +56,20 @@ def get_zoho_commerce_products():
                 
                 if response.status_code == 200:
                     data = response.json()
-                    logger.info(f"📦 Raw API response: {str(data)[:200]}...")
+                    logger.info(f"📦 Raw API response: {str(data)[:500]}...")
+                    
+                    # Check the actual structure of the response
+                    logger.info(f"📦 Response keys: {list(data.keys())}")
+                    if 'payload' in data:
+                        logger.info(f"📦 Payload keys: {list(data['payload'].keys())}")
+                        if 'products' in data['payload']:
+                            logger.info(f"📦 Products in payload: {len(data['payload']['products'])}")
                     
                     products = []
+                    # Try different ways to get products from the response
                     product_list = data.get('products', data.get('data', []))
+                    if 'payload' in data and 'products' in data['payload']:
+                        product_list = data['payload']['products']
                     
                     for product in product_list:
                         products.append({
