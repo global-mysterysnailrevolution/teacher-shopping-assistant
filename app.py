@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-def get_zoho_commerce_products():
+def get_zoho_commerce_products(search_terms=None):
     """
     Get products from Zoho Commerce Storefront API (UNAUTHENTICATED)
     """
@@ -35,19 +35,18 @@ def get_zoho_commerce_products():
         
         logger.info(f"🌐 Using Zoho Commerce Storefront API for domain: {store_domain}")
 
-        # Storefront API endpoints - try different ways to get ALL products
-        api_urls = [
-            "https://commerce.zoho.com/storefront/api/v1/products",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=red",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=bull", 
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=energy",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=drink",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=beckman",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=coulter",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=sample",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=cup",
-            "https://commerce.zoho.com/storefront/api/v1/search-products?q=all"
-        ]
+        # Build dynamic search URLs based on identified item
+        api_urls = ["https://commerce.zoho.com/storefront/api/v1/products"]
+        
+        if search_terms:
+            # Break down the identified item into individual search terms
+            for term in search_terms:
+                if len(term) > 2:  # Only search terms longer than 2 characters
+                    api_urls.append(f"https://commerce.zoho.com/storefront/api/v1/search-products?q={term}")
+                    logger.info(f"🔍 Added search term: {term}")
+        
+        # Always try 'all' as fallback
+        api_urls.append("https://commerce.zoho.com/storefront/api/v1/search-products?q=all")
 
         headers = {
             'domain-name': store_domain,
@@ -122,12 +121,12 @@ def get_zoho_commerce_products():
         logger.error(f"❌ Error getting Zoho Commerce products: {e}")
         return []
 
-def get_biolink_products():
+def get_biolink_products(search_terms=None):
     """
     Get Bio-Link Depot products from Zoho Commerce API ONLY
     """
     # Only use Zoho Commerce API - no web scraping bullshit
-    zoho_products = get_zoho_commerce_products()
+    zoho_products = get_zoho_commerce_products(search_terms)
     if zoho_products:
         logger.info("✅ Using Zoho Commerce API products")
         return zoho_products
@@ -249,8 +248,18 @@ def find_product_url(product_name):
     try:
         logger.info(f"🔍 Starting intelligent search for: '{product_name}'")
         
-        # Step 1: Try Zoho Commerce API first (if credentials are available)
-        zoho_products = get_biolink_products() # Now only calls Zoho API
+        # Extract search terms from the identified product name
+        search_terms = []
+        if product_name:
+            # Break down the product name into individual words
+            words = product_name.lower().split()
+            # Remove common words and keep meaningful terms
+            stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'ml', 'fl', 'oz']
+            search_terms = [word for word in words if word not in stop_words and len(word) > 2]
+            logger.info(f"🔍 Extracted search terms: {search_terms}")
+        
+        # Step 1: Try Zoho Commerce API with dynamic search terms
+        zoho_products = get_biolink_products(search_terms)
         if zoho_products:
             logger.info("✅ Using Zoho Commerce API for product search")
             best_match = analyze_products_with_ai(product_name, zoho_products)
