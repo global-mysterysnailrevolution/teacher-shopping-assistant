@@ -147,75 +147,76 @@ def break_down_product_name(product_name):
 
 def search_biolink_depot(search_term):
     """
-    Search Bio-Link Depot website for a specific term
+    Search Bio-Link Depot using Zoho Commerce API since the site uses dynamic content
     """
     try:
-        logger.info(f"🔍 Searching Bio-Link Depot for: '{search_term}'")
+        logger.info(f"🔍 Searching Bio-Link Depot API for: '{search_term}'")
         
-        # Bio-Link Depot search URL
-        search_url = f"https://www.shopbiolinkdepot.org/search?q={search_term}"
+        # Use Zoho Commerce Storefront API
+        api_url = f"https://commerce.zoho.com/storefront/api/v1/search-products"
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'domain-name': 'www.shopbiolinkdepot.org',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
-        response = requests.get(search_url, headers=headers, timeout=30)
+        params = {
+            'q': search_term,
+            'limit': 20
+        }
+        
+        response = requests.get(api_url, headers=headers, params=params, timeout=30)
         
         if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
+            data = response.json()
+            logger.info(f"📡 API response keys: {list(data.keys())}")
             
-            # Find product links - try multiple selectors
-            product_links = []
+            # Extract products from the response
+            products = []
             
-            # Try different selectors for product links
-            selectors = [
-                'a[href*="/product/"]',
-                'a[href*="/item/"]', 
-                'a[href*="/products/"]',
-                'a[href*="/p/"]',
-                '.product-item a',
-                '.product-link',
-                '.item-link',
-                'a[class*="product"]',
-                'a[class*="item"]'
-            ]
+            # Try different ways to get products from the response
+            product_list = data.get('products', data.get('data', []))
+            if 'payload' in data and 'products' in data['payload']:
+                product_list = data['payload']['products']
             
-            for selector in selectors:
-                links = soup.select(selector)
-                logger.info(f"🔍 Selector '{selector}' found {len(links)} links")
+            logger.info(f"📦 Found {len(product_list)} products in API response")
+            
+            for product in product_list:
+                # Get product URL
+                product_url = product.get('url', '')
+                if not product_url:
+                    # Try different URL fields
+                    product_url = product.get('handle', '')
+                if not product_url:
+                    # Construct URL from product ID
+                    product_id = product.get('product_id', product.get('id', ''))
+                    product_url = f"https://www.shopbiolinkdepot.org/products/{product_id}"
                 
-                for link in links:
-                    href = link.get('href', '')
-                    text = link.get_text(strip=True)
-                    
-                    if href and text:
-                        # Make URL absolute
-                        if href.startswith('/'):
-                            href = f"https://www.shopbiolinkdepot.org{href}"
-                        
-                        product_links.append({
-                            'url': href,
-                            'text': text,
-                            'title': link.get('title', text)
-                        })
+                # Fix relative URLs
+                if product_url.startswith('/'):
+                    product_url = f"https://www.shopbiolinkdepot.org{product_url}"
+                
+                product_name = product.get('name', '')
+                
+                if product_name and product_url:
+                    products.append({
+                        'url': product_url,
+                        'text': product_name,
+                        'title': product_name,
+                        'price': product.get('selling_price', product.get('price', '')),
+                        'description': product.get('description', product.get('short_description', ''))
+                    })
             
-            # Remove duplicates
-            unique_links = []
-            seen_urls = set()
-            for link in product_links:
-                if link['url'] not in seen_urls:
-                    unique_links.append(link)
-                    seen_urls.add(link['url'])
-            
-            logger.info(f"✅ Found {len(unique_links)} unique product links for '{search_term}'")
-            return unique_links
+            logger.info(f"✅ Found {len(products)} products for '{search_term}'")
+            return products
             
         else:
-            logger.error(f"❌ Search failed with status {response.status_code}")
+            logger.error(f"❌ API search failed with status {response.status_code}: {response.text}")
             return []
             
     except Exception as e:
-        logger.error(f"❌ Error searching Bio-Link Depot: {e}")
+        logger.error(f"❌ Error searching Bio-Link Depot API: {e}")
         return []
 
 def analyze_products_with_ai(target_product, product_links):

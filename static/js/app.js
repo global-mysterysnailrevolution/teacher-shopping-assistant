@@ -31,12 +31,18 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function openCamera() {
     console.log('📷 Opening camera...');
-    const modal = new bootstrap.Modal(document.getElementById('cameraModal'));
-    modal.show();
+    const modalElement = document.getElementById('cameraModal');
+    const modal = new bootstrap.Modal(modalElement);
     
-    // Start camera when modal is shown
-    document.getElementById('cameraModal').addEventListener('shown.bs.modal', startCamera);
-    document.getElementById('cameraModal').addEventListener('hidden.bs.modal', stopCamera);
+    // Remove any existing event listeners to prevent duplicates
+    modalElement.removeEventListener('shown.bs.modal', startCamera);
+    modalElement.removeEventListener('hidden.bs.modal', stopCamera);
+    
+    // Add event listeners
+    modalElement.addEventListener('shown.bs.modal', startCamera);
+    modalElement.addEventListener('hidden.bs.modal', stopCamera);
+    
+    modal.show();
 }
 
 /**
@@ -78,6 +84,17 @@ function stopCamera() {
         const video = document.getElementById('cameraVideo');
         video.srcObject = null;
     }
+    
+    // Clean up any modal backdrop
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+    
+    // Remove modal-open class from body
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
 }
 
 /**
