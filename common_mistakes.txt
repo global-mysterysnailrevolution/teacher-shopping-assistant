@@ -1,0 +1,26 @@
+COMMON MISTAKES TO AVOID:
+
+1. PowerShell Commands:
+   - DON'T use: ls -la (Linux command)
+   - USE: dir or Get-ChildItem (PowerShell commands)
+   - DON'T use: && (Linux operator)
+   - USE: ; (PowerShell commands)
+
+2. File Paths:
+   - DON'T try to write to C:\ directly (permission denied)
+   - USE: Current working directory or full path like C:\Users\globa\teacher-shopping-app\
+
+3. File Operations:
+   - DON'T assume files exist without checking
+   - ALWAYS verify file exists before trying to read/modify
+
+4. Tool Usage:
+   - DON'T keep trying the same failing approach
+   - READ the file first, then make targeted changes
+   - USE MultiEdit for multiple changes to same file
+
+5. Context:
+   - DON'T lose track of current working directory
+   - ALWAYS check pwd/Get-Location first
+   - REMEMBER we're in C:\Users\globa\teacher-shopping-app
+

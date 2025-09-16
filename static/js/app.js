@@ -48,8 +48,8 @@ async function startCamera() {
         
         const video = document.getElementById('cameraVideo');
         const constraints = {
-            video: {
-                width: { ideal: 1280 },
+        video: { 
+            width: { ideal: 1280 },
                 height: { ideal: 720 },
                 facingMode: 'environment' // Use back camera on mobile
             }
@@ -87,19 +87,19 @@ function capturePhoto() {
     try {
         console.log('📸 Capturing photo...');
         
-        const video = document.getElementById('cameraVideo');
-        const canvas = document.getElementById('cameraCanvas');
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('cameraCanvas');
         const capturedImage = document.getElementById('capturedImage');
         const capturedImageContainer = document.getElementById('capturedImageContainer');
-        
+    
         // Set canvas dimensions to match video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Draw video frame to canvas
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw video frame to canvas
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
         // Convert canvas to data URL
         capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
         capturedImage.src = capturedImageData;
@@ -109,9 +109,9 @@ function capturePhoto() {
         capturedImageContainer.classList.remove('d-none');
         
         // Update button states
-        document.getElementById('captureBtn').style.display = 'none';
+                document.getElementById('captureBtn').style.display = 'none';
         document.getElementById('retakeBtn').style.display = 'inline-block';
-        document.getElementById('usePhotoBtn').style.display = 'inline-block';
+                document.getElementById('usePhotoBtn').style.display = 'inline-block';
         
         console.log('✅ Photo captured successfully');
         
@@ -250,23 +250,23 @@ function handleDrop(event) {
 async function processImage(imageData) {
     try {
         console.log('🔄 Processing image...');
-        
-        // Show processing section
-        showSection('processing-section');
-        
+    
+    // Show processing section
+    showSection('processing-section');
+    
         // Convert data URL to blob for upload
         const response = await fetch(imageData);
         const blob = await response.blob();
         
         // Create form data
-        const formData = new FormData();
+    const formData = new FormData();
         formData.append('image', blob, 'image.jpg');
-        
-        // Send to server
+    
+    // Send to server
         console.log('📤 Sending image to server...');
         const uploadResponse = await fetch('/upload', {
-            method: 'POST',
-            body: formData
+        method: 'POST',
+        body: formData
         });
         
         console.log('📡 Upload response status:', uploadResponse.status);
@@ -324,7 +324,7 @@ function displayResults(result) {
         html = `
             <div class="identification-item">
                 <strong>Identified Item:</strong> ${identification.identified_item}<br>
-                <strong>Type:</strong> ${identification.item_type}<br>
+            <strong>Type:</strong> ${identification.item_type}<br>
                 <strong>Confidence:</strong> <span class="${confidenceClass}">${identification.confidence}</span><br>
                 ${identification.key_features.length > 0 ? `<strong>Key Features:</strong> ${identification.key_features.join(', ')}<br>` : ''}
                 ${identification.notes ? `<small class="text-muted">${identification.notes}</small>` : ''}
@@ -332,9 +332,9 @@ function displayResults(result) {
         `;
         
         // Show shop button and URL if product URL is available
-        const shopButton = document.getElementById('shopButton');
+    const shopButton = document.getElementById('shopButton');
         if (result.product_url) {
-            shopButton.style.display = 'inline-block';
+        shopButton.style.display = 'inline-block';
             shopButton.onclick = () => goToShop(result.product_url);
             
             // Add the product URL as a hyperlink above the button
@@ -353,9 +353,9 @@ function displayResults(result) {
                     </p>
                 </div>
             `;
-        } else {
-            shopButton.style.display = 'none';
-        }
+    } else {
+        shopButton.style.display = 'none';
+    }
     }
     
     resultsContainer.innerHTML = html;

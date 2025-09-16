@@ -9,9 +9,9 @@ import requests
 import json
 import re
 from flask import Flask, render_template, request, jsonify, redirect, url_for
+# OpenAI will be imported dynamically in get_openai_client()
 from dotenv import load_dotenv
 import logging
-from bs4 import BeautifulSoup
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +22,118 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+def get_zoho_commerce_products(search_terms=None):
+    """
+    Get products from Zoho Commerce Storefront API (UNAUTHENTICATED)
+    """
+    try:
+        import requests
+        
+        # Storefront API is UNAUTHENTICATED - only needs domain-name header
+        store_domain = "www.shopbiolinkdepot.org"  # Your store's domain
+        
+        logger.info(f"🌐 Using Zoho Commerce Storefront API for domain: {store_domain}")
+
+        # Build dynamic search URLs based on identified item
+        api_urls = ["https://commerce.zoho.com/storefront/api/v1/products"]
+        
+        if search_terms:
+            # Break down the identified item into individual search terms
+            for term in search_terms:
+                if len(term) > 2:  # Only search terms longer than 2 characters
+                    api_urls.append(f"https://commerce.zoho.com/storefront/api/v1/search-products?q={term}")
+                    logger.info(f"🔍 Added search term: {term}")
+        
+        # Always try 'all' as fallback
+        api_urls.append("https://commerce.zoho.com/storefront/api/v1/search-products?q=all")
+
+        headers = {
+            'domain-name': store_domain,
+            'Content-Type': 'application/json'
+        }
+        
+        # Try each API endpoint
+        for api_url in api_urls:
+            logger.info(f"🌐 Trying Storefront API: {api_url}")
+            try:
+                response = requests.get(api_url, headers=headers, timeout=30)
+
+                logger.info(f"📡 Response status: {response.status_code}")
+
+        if response.status_code == 200:
+            data = response.json()
+                    logger.info(f"📦 Raw API response: {str(data)[:500]}...")
+                    
+                    # Check the actual structure of the response
+                    logger.info(f"📦 Response keys: {list(data.keys())}")
+                    if 'payload' in data:
+                        logger.info(f"📦 Payload keys: {list(data['payload'].keys())}")
+                        if 'products' in data['payload']:
+                            logger.info(f"📦 Products in payload: {len(data['payload']['products'])}")
+                    
+            products = []
+                    # Try different ways to get products from the response
+                    product_list = data.get('products', data.get('data', []))
+                    if 'payload' in data and 'products' in data['payload']:
+                        product_list = data['payload']['products']
+                    
+                    for product in product_list:
+                        # Get the correct product URL
+                        product_url = product.get('url', '')
+                        if not product_url:
+                            # Try different URL fields
+                            product_url = product.get('handle', '')
+                        if not product_url:
+                            # Construct URL from product ID
+                            product_id = product.get('product_id', product.get('id', ''))
+                            product_url = f"https://www.shopbiolinkdepot.org/products/{product_id}"
+                        
+                        # Fix relative URLs - make them absolute
+                        if product_url.startswith('/'):
+                            product_url = f"https://www.shopbiolinkdepot.org{product_url}"
+                        
+                        logger.info(f"📦 Product: {product.get('name', '')} -> URL: {product_url}")
+                        
+                products.append({
+                    "name": product.get('name', ''),
+                            "id": product.get('product_id', product.get('id', '')),
+                            "price": f"${product.get('selling_price', product.get('price', 0))}",
+                            "description": product.get('description', product.get('short_description', '')),
+                            "status": "active",
+                            "url": product_url
+                        })
+
+                    logger.info(f"✅ Retrieved {len(products)} products from Zoho Commerce Storefront")
+            return products
+
+        else:
+                    logger.error(f"❌ Storefront API error: {response.status_code} - {response.text}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error with {api_url}: {e}")
+                continue
+        
+        logger.error("❌ All Storefront API endpoints failed")
+            return []
+
+    except Exception as e:
+        logger.error(f"❌ Error getting Zoho Commerce products: {e}")
+        return []
+
+def get_biolink_products(search_terms=None):
+    """
+    Get Bio-Link Depot products from Zoho Commerce API ONLY
+    """
+    # Only use Zoho Commerce API - no web scraping bullshit
+    zoho_products = get_zoho_commerce_products(search_terms)
+    if zoho_products:
+        logger.info("✅ Using Zoho Commerce API products")
+        return zoho_products
+
+    # If API fails, return empty list
+    logger.warning("⚠️ Zoho Commerce API failed - no products available")
+    return []
 
 def get_openai_client():
     """Get the OpenAI client instance"""
@@ -61,7 +173,7 @@ def identify_lab_item(image_data):
 
                             Return your response in this exact JSON format:
                             {{
-                                "identified_item": "Specific product name (e.g., 'Red Bull Sugarfree Energy Drink', 'Erlenmeyer Flask 250ml', 'Beaker 500ml'), or 'Not Found' if unclear",
+                                "identified_item": "Specific product name (e.g., 'Red Bull Energy Drink', 'Erlenmeyer Flask 250ml', 'Beaker 500ml'), or 'Not Found' if unclear",
                                 "confidence": "High/Medium/Low",
                                 "item_type": "General category (e.g., Beverage, Flask, Bottle, Filter, etc.)",
                                 "key_features": ["feature1", "feature2", "feature3"],
@@ -82,7 +194,7 @@ def identify_lab_item(image_data):
             ],
             max_tokens=500,
             temperature=0.1,
-            timeout=60
+            timeout=60  # Add timeout to prevent hanging
         )
 
         logger.info("📥 Received response from GPT-4o")
@@ -126,110 +238,53 @@ def identify_lab_item(image_data):
             "notes": f"Error: {str(e)}"
         }
 
-def break_down_product_name(product_name):
+def find_product_url(product_name):
     """
-    Break down product name into individual search terms
+    Find the actual product URL in Bio-Link Depot using intelligent search
     """
-    if not product_name or product_name == "Not Found":
-        return []
+    if product_name == "Not Found":
+        return None
     
-    # Split into words and clean them
-    words = product_name.lower().split()
-    
-    # Remove common stop words
-    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'ml', 'fl', 'oz', 'energy', 'drink'}
-    
-    # Keep meaningful terms
-    search_terms = [word for word in words if word not in stop_words and len(word) > 2]
-    
-    logger.info(f"🔍 Broke down '{product_name}' into search terms: {search_terms}")
-    return search_terms
-
-def search_biolink_depot(search_term):
-    """
-    Search Bio-Link Depot website for a specific term
-    """
     try:
-        logger.info(f"🔍 Searching Bio-Link Depot for: '{search_term}'")
+        logger.info(f"🔍 Starting intelligent search for: '{product_name}'")
         
-        # Bio-Link Depot search URL
-        search_url = f"https://www.shopbiolinkdepot.org/search?q={search_term}"
+        # Extract search terms from the identified product name
+        search_terms = []
+        if product_name:
+            # Break down the product name into individual words
+            words = product_name.lower().split()
+            # Remove common words and keep meaningful terms
+            stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'ml', 'fl', 'oz']
+            search_terms = [word for word in words if word not in stop_words and len(word) > 2]
+            logger.info(f"🔍 Extracted search terms: {search_terms}")
         
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        # Step 1: Try Zoho Commerce API with dynamic search terms
+        zoho_products = get_biolink_products(search_terms)
+        if zoho_products:
+            logger.info("✅ Using Zoho Commerce API for product search")
+            best_match = analyze_products_with_ai(product_name, zoho_products)
+            if best_match:
+                logger.info(f"✅ Found match in Zoho API: {best_match['name']}")
+                return best_match['url']
         
-        response = requests.get(search_url, headers=headers, timeout=30)
+        # Step 2: If no match found in API, return None
+        logger.warning(f"⚠️ No product match found in Zoho Commerce API, returning None")
+        return None
         
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Find product links - try multiple selectors
-            product_links = []
-            
-            # Try different selectors for product links
-            selectors = [
-                'a[href*="/product/"]',
-                'a[href*="/item/"]', 
-                'a[href*="/products/"]',
-                'a[href*="/p/"]',
-                '.product-item a',
-                '.product-link',
-                '.item-link',
-                'a[class*="product"]',
-                'a[class*="item"]'
-            ]
-            
-            for selector in selectors:
-                links = soup.select(selector)
-                logger.info(f"🔍 Selector '{selector}' found {len(links)} links")
-                
-                for link in links:
-                    href = link.get('href', '')
-                    text = link.get_text(strip=True)
-                    
-                    if href and text:
-                        # Make URL absolute
-                        if href.startswith('/'):
-                            href = f"https://www.shopbiolinkdepot.org{href}"
-                        
-                        product_links.append({
-                            'url': href,
-                            'text': text,
-                            'title': link.get('title', text)
-                        })
-            
-            # Remove duplicates
-            unique_links = []
-            seen_urls = set()
-            for link in product_links:
-                if link['url'] not in seen_urls:
-                    unique_links.append(link)
-                    seen_urls.add(link['url'])
-            
-            logger.info(f"✅ Found {len(unique_links)} unique product links for '{search_term}'")
-            return unique_links
-            
-        else:
-            logger.error(f"❌ Search failed with status {response.status_code}")
-            return []
-            
     except Exception as e:
-        logger.error(f"❌ Error searching Bio-Link Depot: {e}")
-        return []
+        logger.error(f"❌ Error in intelligent search: {e}")
+        return None
 
-def analyze_products_with_ai(target_product, product_links):
+
+def analyze_products_with_ai(target_product, product_list):
     """
-    Use AI to analyze product links and find the best match
+    Use AI to analyze product list and find the best match
     """
     try:
-        logger.info(f"🤖 AI analyzing {len(product_links)} products for match with '{target_product}'")
-        
-        if not product_links:
-            return None
+        logger.info(f"🤖 AI analyzing {len(product_list)} products for match with '{target_product}'")
         
         # Prepare product list for AI
-        products_text = "\n".join([f"{i+1}. {product['text']} - {product['url']}" for i, product in enumerate(product_links)])
+        products_text = "\n".join([f"{i+1}. {product['name']}" for i, product in enumerate(product_list)])
         
         # Get OpenAI client
         client = get_openai_client()
@@ -246,7 +301,7 @@ def analyze_products_with_ai(target_product, product_links):
         Return your response in this exact JSON format:
         {{
             "match_found": true/false,
-            "best_match_number": 1-{len(product_links)} (the number from the list above, or null if no match),
+            "best_match_number": 1-{len(product_list)} (the number from the list above),
             "confidence": "High/Medium/Low",
             "reasoning": "Why this is or isn't a match"
         }}
@@ -269,15 +324,16 @@ def analyze_products_with_ai(target_product, product_links):
         logger.info(f"🤖 AI response: {response_content}")
         
         # Parse AI response
+        import re
         json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
         if json_match:
             result = json.loads(json_match.group())
             
             if result.get('match_found') and result.get('best_match_number'):
                 match_index = result['best_match_number'] - 1
-                if 0 <= match_index < len(product_links):
-                    best_product = product_links[match_index]
-                    logger.info(f"✅ AI found match: {best_product['text']} (confidence: {result.get('confidence', 'Unknown')})")
+                if 0 <= match_index < len(product_list):
+                    best_product = product_list[match_index]
+                    logger.info(f"✅ AI found match: {best_product['name']} (confidence: {result.get('confidence', 'Unknown')})")
                     return best_product
         
         logger.info("⚠️ AI found no suitable match")
@@ -285,59 +341,6 @@ def analyze_products_with_ai(target_product, product_links):
         
     except Exception as e:
         logger.error(f"❌ Error in AI analysis: {e}")
-        return None
-
-def find_product_url(product_name):
-    """
-    Find the actual product URL in Bio-Link Depot using intelligent search
-    """
-    if product_name == "Not Found":
-        return None
-    
-    try:
-        logger.info(f"🔍 Starting intelligent search for: '{product_name}'")
-        
-        # Step 1: Break down the product name into search terms
-        search_terms = break_down_product_name(product_name)
-        
-        if not search_terms:
-            logger.warning("⚠️ No search terms extracted")
-            return None
-        
-        # Step 2: Try each search term
-        for term in search_terms:
-            logger.info(f"🔍 Trying search: '{term}'")
-            
-            # Search Bio-Link Depot
-            product_links = search_biolink_depot(term)
-            
-            if product_links:
-                # Use AI to find the best match
-                best_match = analyze_products_with_ai(product_name, product_links)
-                
-                if best_match:
-                    logger.info(f"✅ Found match for '{term}': {best_match['text']}")
-                    return best_match['url']
-                else:
-                    logger.info(f"⚠️ No AI match found for '{term}', trying next term...")
-            else:
-                logger.info(f"⚠️ No products found for '{term}', trying next term...")
-        
-        # Step 3: If no individual terms worked, try the full name
-        logger.info(f"🔍 Trying full name search: '{product_name}'")
-        product_links = search_biolink_depot(product_name)
-        
-        if product_links:
-            best_match = analyze_products_with_ai(product_name, product_links)
-            if best_match:
-                logger.info(f"✅ Found match with full name: {best_match['text']}")
-                return best_match['url']
-        
-        logger.warning(f"⚠️ No product found for '{product_name}'")
-        return None
-        
-    except Exception as e:
-        logger.error(f"❌ Error in intelligent search: {e}")
         return None
 
 @app.route('/')
