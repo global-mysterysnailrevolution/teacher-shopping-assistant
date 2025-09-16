@@ -6,9 +6,31 @@
 let currentStream = null;
 let capturedImageData = null;
 
+/**
+ * Clean up modal backdrops and reset body styles
+ */
+function cleanupModalBackdrops() {
+    // Remove all modal backdrops
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(backdrop => backdrop.remove());
+    
+    // Remove modal-open class from body
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+    
+    // Remove any inline styles that might be blocking interaction
+    document.body.style.pointerEvents = '';
+    
+    console.log('🧹 Cleaned up modal backdrops');
+}
+
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🎯 Teacher Shopping Assistant initialized');
+    
+    // Clean up any existing modal backdrops immediately
+    cleanupModalBackdrops();
     
     // Set up file input change handler
     const imageInput = document.getElementById('imageInput');
@@ -24,6 +46,15 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadArea.addEventListener('drop', handleDrop);
         uploadArea.addEventListener('click', openFileUpload);
     }
+    
+    // Add global click handler to clean up backdrops
+    document.addEventListener('click', function(e) {
+        // If clicking on a backdrop, remove it
+        if (e.target.classList.contains('modal-backdrop')) {
+            e.target.remove();
+            cleanupModalBackdrops();
+        }
+    });
 });
 
 /**
@@ -85,16 +116,8 @@ function stopCamera() {
         video.srcObject = null;
     }
     
-    // Clean up any modal backdrop
-    const backdrop = document.querySelector('.modal-backdrop');
-    if (backdrop) {
-        backdrop.remove();
-    }
-    
-    // Remove modal-open class from body
-    document.body.classList.remove('modal-open');
-    document.body.style.overflow = '';
-    document.body.style.paddingRight = '';
+    // Clean up modal backdrops
+    cleanupModalBackdrops();
 }
 
 /**
@@ -157,6 +180,9 @@ function retakePhoto() {
     document.getElementById('usePhotoBtn').style.display = 'none';
     
     capturedImageData = null;
+    
+    // Clean up any stray backdrops
+    cleanupModalBackdrops();
 }
 
 /**
@@ -170,9 +196,20 @@ function useCapturedPhoto() {
     
     console.log('✅ Using captured photo...');
     
-    // Close camera modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('cameraModal'));
-    modal.hide();
+    // Close camera modal properly
+    const modalElement = document.getElementById('cameraModal');
+    const modal = bootstrap.Modal.getInstance(modalElement);
+    
+    if (modal) {
+        modal.hide();
+    } else {
+        // If no modal instance, manually hide it
+        modalElement.classList.remove('show');
+        modalElement.style.display = 'none';
+    }
+    
+    // Clean up modal backdrops immediately
+    cleanupModalBackdrops();
     
     // Process the image
     processImage(capturedImageData);
