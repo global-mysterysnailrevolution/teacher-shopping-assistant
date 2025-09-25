@@ -396,20 +396,24 @@ def upload_image():
 
         # Find product URL if item was identified
         product_url = None
+        item_in_inventory = False
+        
         if identification_result["identified_item"] != "Not Found":
             product_url = find_product_url(identification_result["identified_item"])
             
-            # If no specific product found, provide a general store search link
-            if not product_url:
-                search_term = identification_result["identified_item"].replace(" ", "+")
-                product_url = f"https://www.shopbiolinkdepot.org/search?q={search_term}"
-                logger.info(f"🔗 No specific product found, providing general search link: {product_url}")
+            # Check if we found a product in inventory
+            if product_url:
+                item_in_inventory = True
+                logger.info(f"✅ Item found in inventory: {product_url}")
+            else:
+                logger.info(f"⚠️ Item '{identification_result['identified_item']}' not found in inventory")
 
         # Return results
         result = {
             "success": True,
             "identification": identification_result,
             "product_url": product_url,
+            "item_in_inventory": item_in_inventory,
             "image_data": f"data:image/jpeg;base64,{base64_image}"
         }
 

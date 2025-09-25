@@ -385,18 +385,19 @@ function displayResults(result) {
             </div>
         `;
         
-        // Show shop button and URL if product URL is available
-    const shopButton = document.getElementById('shopButton');
-        if (result.product_url) {
-        shopButton.style.display = 'inline-block';
+        // Show appropriate message based on inventory status
+        const shopButton = document.getElementById('shopButton');
+        
+        if (result.item_in_inventory && result.product_url) {
+            // Item found in inventory - show shop button and link
+            shopButton.style.display = 'inline-block';
             shopButton.onclick = () => goToShop(result.product_url);
             
-            // Add the product URL as a hyperlink above the button
             html += `
                 <div class="mt-3 text-center">
                     <h5 class="text-success mb-3">
                         <i class="fas fa-check-circle me-2"></i>
-                        Product Found!
+                        Product Found in Inventory!
                     </h5>
                     <p class="mb-3">
                         <strong>Direct Link:</strong> 
@@ -407,9 +408,23 @@ function displayResults(result) {
                     </p>
                 </div>
             `;
-    } else {
-        shopButton.style.display = 'none';
-    }
+        } else {
+            // Item not in inventory - show message to mark down and estimate
+            shopButton.style.display = 'none';
+            
+            html += `
+                <div class="mt-3 text-center">
+                    <h5 class="text-warning mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Item Not in Inventory
+                    </h5>
+                    <div class="alert alert-warning">
+                        <p class="mb-2"><strong>Please mark this item down on your sheet and estimate the price.</strong></p>
+                        <p class="mb-0">This item is not currently available in our store inventory.</p>
+                    </div>
+                </div>
+            `;
+        }
     }
     
     resultsContainer.innerHTML = html;
