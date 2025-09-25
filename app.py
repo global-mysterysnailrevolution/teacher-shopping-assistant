@@ -249,14 +249,15 @@ def analyze_products_with_ai(target_product, product_links):
             "match_found": true/false,
             "best_match_number": 1-{len(product_links)} (the number from the list above, or null if no match),
             "confidence": "High/Medium/Low",
-            "reasoning": "Why this is or isn't a match"
+            "reasoning": "Why this is or isn't a match",
+            "fallback_match_number": 1-{len(product_links)} (the number of the most similar product if no exact match, or null)
         }}
         
         Consider:
         - Brand names (Red Bull, Coca-Cola, etc.)
         - Product types (Energy Drink, Flask, Beaker, etc.)
         - Variations (Sugarfree, Sugar-Free, etc.)
-        - Similar products if exact match not found
+        - If no exact match, suggest the most similar product as a fallback
         """
         
         response = client.ChatCompletion.create(
@@ -274,12 +275,21 @@ def analyze_products_with_ai(target_product, product_links):
         if json_match:
             result = json.loads(json_match.group())
             
+            # Check for exact match first
             if result.get('match_found') and result.get('best_match_number'):
                 match_index = result['best_match_number'] - 1
                 if 0 <= match_index < len(product_links):
                     best_product = product_links[match_index]
-                    logger.info(f"✅ AI found match: {best_product['text']} (confidence: {result.get('confidence', 'Unknown')})")
+                    logger.info(f"✅ AI found exact match: {best_product['text']} (confidence: {result.get('confidence', 'Unknown')})")
                     return best_product
+            
+            # If no exact match, try fallback match
+            elif result.get('fallback_match_number'):
+                fallback_index = result['fallback_match_number'] - 1
+                if 0 <= fallback_index < len(product_links):
+                    fallback_product = product_links[fallback_index]
+                    logger.info(f"🔄 AI found fallback match: {fallback_product['text']} (reasoning: {result.get('reasoning', 'Unknown')})")
+                    return fallback_product
         
         logger.info("⚠️ AI found no suitable match")
         return None
@@ -305,6 +315,9 @@ def find_product_url(product_name):
             logger.warning("⚠️ No search terms extracted")
             return None
         
+        # Store all found products for fallback analysis
+        all_found_products = []
+        
         # Step 2: Try each search term
         for term in search_terms:
             logger.info(f"🔍 Trying search: '{term}'")
@@ -313,6 +326,9 @@ def find_product_url(product_name):
             product_links = search_biolink_depot(term)
             
             if product_links:
+                # Add to our collection of all products
+                all_found_products.extend(product_links)
+                
                 # Use AI to find the best match
                 best_match = analyze_products_with_ai(product_name, product_links)
                 
@@ -329,9 +345,18 @@ def find_product_url(product_name):
         product_links = search_biolink_depot(product_name)
         
         if product_links:
+            all_found_products.extend(product_links)
             best_match = analyze_products_with_ai(product_name, product_links)
             if best_match:
                 logger.info(f"✅ Found match with full name: {best_match['text']}")
+                return best_match['url']
+        
+        # Step 4: If still no match, try analyzing all found products together
+        if all_found_products:
+            logger.info(f"🔄 No exact match found, analyzing {len(all_found_products)} total products for best fallback...")
+            best_match = analyze_products_with_ai(product_name, all_found_products)
+            if best_match:
+                logger.info(f"🔄 Found fallback match: {best_match['text']}")
                 return best_match['url']
         
         logger.warning(f"⚠️ No product found for '{product_name}'")
@@ -373,6 +398,12 @@ def upload_image():
         product_url = None
         if identification_result["identified_item"] != "Not Found":
             product_url = find_product_url(identification_result["identified_item"])
+            
+            # If no specific product found, provide a general store search link
+            if not product_url:
+                search_term = identification_result["identified_item"].replace(" ", "+")
+                product_url = f"https://www.shopbiolinkdepot.org/search?q={search_term}"
+                logger.info(f"🔗 No specific product found, providing general search link: {product_url}")
 
         # Return results
         result = {
