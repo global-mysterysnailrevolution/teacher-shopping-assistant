@@ -389,25 +389,29 @@ function displayResults(result) {
         const shopButton = document.getElementById('shopButton');
         
         if (result.item_in_inventory && result.product_url) {
-            // Item found in inventory - show shop button and link
-            shopButton.style.display = 'inline-block';
-            shopButton.onclick = () => goToShop(result.product_url);
-            
+            // Item found in inventory - automatically redirect to store
             html += `
                 <div class="mt-3 text-center">
                     <h5 class="text-success mb-3">
                         <i class="fas fa-check-circle me-2"></i>
                         Product Found in Inventory!
                     </h5>
-                    <p class="mb-3">
-                        <strong>Direct Link:</strong> 
-                        <a href="${result.product_url}" target="_blank" class="text-primary text-decoration-none">
-                            ${result.product_url}
-                            <i class="fas fa-external-link-alt ms-1"></i>
-                        </a>
-                    </p>
+                    <div class="alert alert-success">
+                        <p class="mb-2"><strong>Redirecting you to the product page...</strong></p>
+                        <p class="mb-0">You will be taken to the item in our store.</p>
+                    </div>
                 </div>
             `;
+            
+            // Show shop button as backup option
+            shopButton.style.display = 'inline-block';
+            shopButton.onclick = () => goToShop(result.product_url);
+            
+            // Automatically redirect to the product page after a short delay
+            setTimeout(() => {
+                console.log('🛒 Auto-redirecting to product page:', result.product_url);
+                window.open(result.product_url, '_blank');
+            }, 2000); // 2 second delay to let user see the message
         } else {
             // Item not in inventory - show message to mark down and estimate
             shopButton.style.display = 'none';
