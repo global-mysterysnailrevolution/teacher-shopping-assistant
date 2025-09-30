@@ -430,7 +430,7 @@ def upload_image():
             return jsonify({
                 'error': 'Please log in to the store first',
                 'login_required': True,
-                'store_url': 'https://www.shopbiolinkdepot.org/login'
+                'store_url': 'https://www.shopbiolinkdepot.org/signin'
             }), 401
         
         if 'image' not in request.files:
