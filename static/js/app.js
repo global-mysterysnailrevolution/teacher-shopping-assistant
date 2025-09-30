@@ -331,19 +331,6 @@ async function processImage(imageData) {
         if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text();
             console.error('❌ Server error response:', errorText);
-            
-            // Try to parse as JSON to check for login error
-            try {
-                const errorResult = JSON.parse(errorText);
-                if (errorResult.login_required) {
-                    console.log('🔐 Login required, redirecting to login section');
-                    showSection('login-section');
-                    return;
-                }
-            } catch (e) {
-                // Not JSON, continue with original error handling
-            }
-            
             throw new Error(`Server error: ${uploadResponse.status} - ${errorText}`);
         }
         
@@ -460,19 +447,20 @@ async function checkLoginStatus() {
     try {
         console.log('🔐 Checking login status...');
         
-        const response = await fetch('/check-login', {
-            method: 'GET',
-            credentials: 'include' // Include cookies
-        });
+        // Check if user has confirmed they're logged in (stored locally)
+        const userConfirmedLogin = localStorage.getItem('zoho_logged_in');
+        const loginTimestamp = localStorage.getItem('zoho_login_time');
         
-        const result = await response.json();
-        console.log('🔐 Login check result:', result);
+        // Check if login confirmation is still valid (24 hours)
+        const now = Date.now();
+        const loginTime = parseInt(loginTimestamp || '0');
+        const isLoginValid = userConfirmedLogin === 'true' && (now - loginTime) < (24 * 60 * 60 * 1000);
         
-        if (result.logged_in) {
-            console.log('✅ User is logged in, showing upload section');
+        if (isLoginValid) {
+            console.log('✅ User confirmed login is still valid, showing upload section');
             showSection('upload-section');
         } else {
-            console.log('❌ User is not logged in, showing login section');
+            console.log('❌ User needs to confirm login, showing login section');
             showSection('login-section');
         }
         
@@ -481,6 +469,20 @@ async function checkLoginStatus() {
         // On error, show login section to be safe
         showSection('login-section');
     }
+}
+
+/**
+ * Confirm that user is logged in to Zoho Commerce
+ */
+function confirmLogin() {
+    console.log('✅ User confirmed they are logged in');
+    
+    // Store login confirmation in localStorage
+    localStorage.setItem('zoho_logged_in', 'true');
+    localStorage.setItem('zoho_login_time', Date.now().toString());
+    
+    // Show upload section
+    showSection('upload-section');
 }
 
 /**
@@ -544,3 +546,4 @@ window.useCapturedPhoto = useCapturedPhoto;
 window.goToShop = goToShop;
 window.resetApp = resetApp;
 window.checkLoginStatus = checkLoginStatus;
+window.confirmLogin = confirmLogin;
