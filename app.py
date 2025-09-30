@@ -371,10 +371,68 @@ def index():
     """Main page"""
     return render_template('index.html')
 
+@app.route('/check-login', methods=['GET'])
+def check_login():
+    """Check if user is logged into Zoho Commerce store"""
+    try:
+        # Get the session cookie from the request
+        session_cookie = request.cookies.get('zoho_session', '')
+        
+        if not session_cookie:
+            return jsonify({
+                'logged_in': False,
+                'message': 'No session found'
+            })
+        
+        # Check with Zoho Commerce API to verify the session
+        api_url = "https://commerce.zoho.com/storefront/api/v1/customer/profile"
+        
+        headers = {
+            'domain-name': 'www.shopbiolinkdepot.org',
+            'Content-Type': 'application/json',
+            'Cookie': f'zoho_session={session_cookie}',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # If we get customer data, they're logged in
+            if data.get('customer') or data.get('profile'):
+                logger.info("✅ User is logged into Zoho Commerce")
+                return jsonify({
+                    'logged_in': True,
+                    'message': 'User is logged in',
+                    'customer_data': data.get('customer', data.get('profile', {}))
+                })
+        
+        logger.info("❌ User is not logged into Zoho Commerce")
+        return jsonify({
+            'logged_in': False,
+            'message': 'Session invalid or expired'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error checking login status: {e}")
+        return jsonify({
+            'logged_in': False,
+            'message': f'Error checking login: {str(e)}'
+        })
+
 @app.route('/upload', methods=['POST'])
 def upload_image():
     """Handle image upload and identification"""
     try:
+        # First check if user is logged in
+        session_cookie = request.cookies.get('zoho_session', '')
+        if not session_cookie:
+            return jsonify({
+                'error': 'Please log in to the store first',
+                'login_required': True,
+                'store_url': 'https://www.shopbiolinkdepot.org/login'
+            }), 401
+        
         if 'image' not in request.files:
             return jsonify({'error': 'No image file provided'}), 400
 

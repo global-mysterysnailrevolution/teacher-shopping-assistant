@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Clean up any existing modal backdrops immediately
     cleanupModalBackdrops();
     
+    // Check login status on page load
+    checkLoginStatus();
+    
     // Set up file input change handler
     const imageInput = document.getElementById('imageInput');
     if (imageInput) {
@@ -328,6 +331,19 @@ async function processImage(imageData) {
         if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text();
             console.error('❌ Server error response:', errorText);
+            
+            // Try to parse as JSON to check for login error
+            try {
+                const errorResult = JSON.parse(errorText);
+                if (errorResult.login_required) {
+                    console.log('🔐 Login required, redirecting to login section');
+                    showSection('login-section');
+                    return;
+                }
+            } catch (e) {
+                // Not JSON, continue with original error handling
+            }
+            
             throw new Error(`Server error: ${uploadResponse.status} - ${errorText}`);
         }
         
@@ -438,10 +454,40 @@ function displayResults(result) {
 }
 
 /**
+ * Check if user is logged into Zoho Commerce store
+ */
+async function checkLoginStatus() {
+    try {
+        console.log('🔐 Checking login status...');
+        
+        const response = await fetch('/check-login', {
+            method: 'GET',
+            credentials: 'include' // Include cookies
+        });
+        
+        const result = await response.json();
+        console.log('🔐 Login check result:', result);
+        
+        if (result.logged_in) {
+            console.log('✅ User is logged in, showing upload section');
+            showSection('upload-section');
+        } else {
+            console.log('❌ User is not logged in, showing login section');
+            showSection('login-section');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error checking login status:', error);
+        // On error, show login section to be safe
+        showSection('login-section');
+    }
+}
+
+/**
  * Show specific section and hide others
  */
 function showSection(sectionId) {
-    const sections = ['upload-section', 'processing-section', 'results-section'];
+    const sections = ['login-section', 'upload-section', 'processing-section', 'results-section'];
     
     sections.forEach(id => {
         const section = document.getElementById(id);
@@ -497,3 +543,4 @@ window.retakePhoto = retakePhoto;
 window.useCapturedPhoto = useCapturedPhoto;
 window.goToShop = goToShop;
 window.resetApp = resetApp;
+window.checkLoginStatus = checkLoginStatus;
